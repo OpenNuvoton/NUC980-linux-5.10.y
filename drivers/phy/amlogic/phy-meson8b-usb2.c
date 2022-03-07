@@ -154,7 +154,6 @@ static int phy_meson8b_usb2_power_on(struct phy *phy)
 	ret = clk_prepare_enable(priv->clk_usb_general);
 	if (ret) {
 		dev_err(&phy->dev, "Failed to enable USB general clock\n");
-		reset_control_rearm(priv->reset);
 		return ret;
 	}
 
@@ -162,7 +161,6 @@ static int phy_meson8b_usb2_power_on(struct phy *phy)
 	if (ret) {
 		dev_err(&phy->dev, "Failed to enable USB DDR clock\n");
 		clk_disable_unprepare(priv->clk_usb_general);
-		reset_control_rearm(priv->reset);
 		return ret;
 	}
 
@@ -201,7 +199,6 @@ static int phy_meson8b_usb2_power_on(struct phy *phy)
 				dev_warn(&phy->dev, "USB ID detect failed!\n");
 				clk_disable_unprepare(priv->clk_usb);
 				clk_disable_unprepare(priv->clk_usb_general);
-				reset_control_rearm(priv->reset);
 				return -EINVAL;
 			}
 		}
@@ -221,7 +218,6 @@ static int phy_meson8b_usb2_power_off(struct phy *phy)
 
 	clk_disable_unprepare(priv->clk_usb);
 	clk_disable_unprepare(priv->clk_usb_general);
-	reset_control_rearm(priv->reset);
 
 	return 0;
 }

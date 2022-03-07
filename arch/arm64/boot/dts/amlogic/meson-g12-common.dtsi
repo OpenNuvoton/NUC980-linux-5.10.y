@@ -17,12 +17,6 @@
 	#address-cells = <2>;
 	#size-cells = <2>;
 
-	aliases {
-		mmc0 = &sd_emmc_a; /* SDIO */
-		mmc1 = &sd_emmc_b; /* SDCARD */
-		mmc2 = &sd_emmc_c; /* EMMC */
-	};
-
 	chosen {
 		#address-cells = <2>;
 		#size-cells = <2>;
@@ -96,13 +90,13 @@
 		method = "smc";
 	};
 
-	reserved_memory: reserved-memory {
+	reserved-memory {
 		#address-cells = <2>;
 		#size-cells = <2>;
 		ranges;
 
 		/* 3 MiB reserved for ARM Trusted Firmware (BL31) */
-		secmon_reserved_alt: secmon@5000000 {
+		secmon_reserved: secmon@5000000 {
 			reg = <0x0 0x05000000 0x0 0x300000>;
 			no-map;
 		};
@@ -1929,7 +1923,7 @@
 							groups = "uart_ao_a_tx",
 								 "uart_ao_a_rx";
 							function = "uart_ao_a";
-							bias-pull-up;
+							bias-disable;
 						};
 					};
 
@@ -1938,7 +1932,7 @@
 							groups = "uart_ao_a_cts",
 								 "uart_ao_a_rts";
 							function = "uart_ao_a";
-							bias-pull-up;
+							bias-disable;
 						};
 					};
 
@@ -2191,12 +2185,6 @@
 				interrupt-controller;
 				#interrupt-cells = <2>;
 				amlogic,channel-interrupts = <64 65 66 67 68 69 70 71>;
-			};
-
-			watchdog: wdt@f0d0 {
-				compatible = "amlogic,meson-gxbb-wdt";
-				reg = <0x0 0xf0d0 0x0 0x10>;
-				clocks = <&xtal>;
 			};
 
 			spicc0: spi@13000 {

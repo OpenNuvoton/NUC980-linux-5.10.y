@@ -78,15 +78,6 @@ config USB_XHCI_MTK
 	  found in MediaTek SoCs.
 	  If unsure, say N.
 
-config USB_XHCI_SUNXI
-        tristate "xHCI support for Allwinner SoCs"
-        depends on RESET_CONTROLLER
-        depends on ARCH_SUNXI || COMPILE_TEST
-        help
-          Say 'Y' to enable the support for the xHCI host controller
-          found in some new Allwinner ARMv8 SoCs.
-	  If unsure, say N.
-
 config USB_XHCI_MVEBU
 	tristate "xHCI support for Marvell Armada 375/38x/37xx"
 	select USB_XHCI_PLATFORM
@@ -221,6 +212,36 @@ config USB_EHCI_FSL
 	select USB_EHCI_ROOT_HUB_TT
 	help
 	  Variation of ARC USB block used in some Freescale chips.
+
+config USB_NUC980_EHCI
+	tristate "Support for NUC980 EHCI (USB 2.0)"
+	depends on ARCH_NUC980
+	help
+	  Enables support for NUC980 USB EHCI controller.
+
+choice
+    prompt "NUC980 USB Host power pin select"
+    default NUC980_USBH_PWREN_OVC_ON
+	depends on !USE_OF
+    depends on USB_NUC980_EHCI
+
+    config NUC980_USBH_PWREN_OVC_ON
+	bool "Use PE.12 for USBH_PWREN and PE.10 for USB_OVC"
+    config NUC980_USBH_PWREN_ON
+	bool "Use PE.12 for USBH_PWREN"
+    config NUC980_USBH_OVC_ON
+	bool "Use PE.10 for USB_OVC"
+    config NUC980_USBH_PWREN_OVC_OFF
+	bool "No USBH_PWREN and USB_OVC"
+endchoice
+
+config USB_NUC980_PM_VBUS_OFF
+	bool "NUC980 turn off USB Host VBUS power while power down"
+	depends on !USE_OF
+	depends on USB_NUC980_EHCI && (NUC980_USBH_PWREN_OVC_ON || NUC980_USBH_PWREN_ON)
+	help
+	  While kernel in power down mode, turn off USB Host port VBUS power supply.
+	  After kernel resumed, all connected USB devices will be re-enumerated.
 
 config USB_EHCI_MXC
 	tristate "Support for Freescale i.MX on-chip EHCI USB controller"

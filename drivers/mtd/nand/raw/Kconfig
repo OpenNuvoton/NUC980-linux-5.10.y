@@ -68,6 +68,12 @@ config MTD_NAND_OMAP2
 	  Support for NAND flash on Texas Instruments OMAP2, OMAP3, OMAP4
 	  and Keystone platforms.
 
+config MTD_NAND_NUC980
+	tristate "Nuvoton NUC980 MTD NAND"
+	depends on ARCH_NUC980 && NUC980_FMI_MTD_NAND
+	help
+	  This enables the driver for the NAND Flash on NUC980.
+
 config MTD_NAND_OMAP_BCH
 	depends on MTD_NAND_OMAP2
 	bool "Support hardware based BCH error correction"

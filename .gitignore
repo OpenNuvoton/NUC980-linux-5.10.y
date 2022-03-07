@@ -1,4 +1,3 @@
-# SPDX-License-Identifier: GPL-2.0-only
 #
 # NOTE! Don't add files that are generated in specific
 # subdirectories here. Add them in the ".gitignore" file
@@ -8,46 +7,37 @@
 # command after changing this file, to see if there are
 # any tracked files which get ignored after the change.
 #
-# Normal rules (sorted alphabetically)
+# Normal rules
 #
 .*
-*.a
-*.asn1.[ch]
-*.bin
-*.bz2
-*.c.[012]*.*
-*.dt.yaml
-*.dtb
-*.dtb.S
-*.dwo
-*.elf
-*.gcno
-*.gz
-*.i
-*.ko
-*.lex.c
-*.ll
-*.lst
-*.lz4
-*.lzma
-*.lzo
-*.mod
-*.mod.c
 *.o
 *.o.*
-*.patch
+*.a
 *.s
+*.ko
 *.so
 *.so.dbg
-*.su
+*.mod.c
+*.i
+*.lst
 *.symtypes
-*.tab.[ch]
+*.order
+*.elf
+*.bin
 *.tar
+*.gz
+*.bz2
+*.lzma
 *.xz
-*.zst
-Module.symvers
+*.lz4
+*.lzo
+*.patch
+*.gcno
+*.ll
 modules.builtin
-modules.order
+Module.symvers
+*.dwo
+*.su
 
 #
 # Top-level generic files
@@ -55,21 +45,12 @@ modules.order
 /tags
 /TAGS
 /linux
-/modules-only.symvers
 /vmlinux
 /vmlinux.32
-/vmlinux.symvers
 /vmlinux-gdb.py
 /vmlinuz
 /System.map
 /Module.markers
-/modules.builtin.modinfo
-/modules.nsdeps
-
-#
-# RPM spec file (make rpm-pkg)
-#
-/*.spec
 
 #
 # Debian directory (make deb-pkg)
@@ -77,32 +58,22 @@ modules.order
 /debian/
 
 #
-# Snap directory (make snap-pkg)
-#
-/snap/
-
-#
 # tar directory (make tar*-pkg)
 #
 /tar-install/
 
 #
-# We don't want to ignore the following even if they are dot-files
+# git files that we don't want to ignore even it they are dot-files
 #
-!.clang-format
-!.cocciconfig
-!.get_maintainer.ignore
-!.gitattributes
 !.gitignore
 !.mailmap
 
 #
 # Generated include files
 #
-/include/config/
-/include/generated/
-/include/ksym/
-/arch/*/include/generated/
+include/config
+include/generated
+arch/*/include/generated
 
 # stgit generated dirs
 patches-*
@@ -138,21 +109,7 @@ signing_key.x509
 x509.genkey
 
 # Kconfig presets
-/all.config
-/alldef.config
-/allmod.config
-/allno.config
-/allrandom.config
-/allyes.config
-
-# Kconfig savedefconfig output
-/defconfig
+all.config
 
 # Kdevelop4
 *.kdev4
-
-# Clang's compilation database file
-/compile_commands.json
-
-# Documentation toolchain
-sphinx_*/

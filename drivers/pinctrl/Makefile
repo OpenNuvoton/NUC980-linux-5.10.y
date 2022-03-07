@@ -47,6 +47,12 @@ obj-$(CONFIG_PINCTRL_INGENIC)	+= pinctrl-ingenic.o
 obj-$(CONFIG_PINCTRL_RK805)	+= pinctrl-rk805.o
 obj-$(CONFIG_PINCTRL_OCELOT)	+= pinctrl-ocelot.o
 obj-$(CONFIG_PINCTRL_EQUILIBRIUM)   += pinctrl-equilibrium.o
+ifeq ($(CONFIG_USE_OF),y)
+obj-$(CONFIG_PINCTRL_NUC980)    += pinctrl-nuc980-dt.o
+else
+obj-$(CONFIG_PINCTRL_NUC980)    += pinctrl-nuc980.o
+endif
+
 
 obj-y				+= actions/
 obj-$(CONFIG_ARCH_ASPEED)	+= aspeed/

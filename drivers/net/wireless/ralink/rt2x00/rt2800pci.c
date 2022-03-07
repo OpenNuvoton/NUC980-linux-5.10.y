@@ -286,10 +286,6 @@ static int rt2800pci_read_eeprom(struct rt2x00_dev *rt2x00dev)
 	return retval;
 }
 
-static int rt2800pci_get_chippkg(void) { return 0; }
-static int rt2800pci_get_chipver(void) { return 0; }
-static int rt2800pci_get_chipeco(void) { return 0; }
-
 static const struct ieee80211_ops rt2800pci_mac80211_ops = {
 	.tx			= rt2x00mac_tx,
 	.start			= rt2x00mac_start,
@@ -332,9 +328,6 @@ static const struct rt2800_ops rt2800pci_rt2800_ops = {
 	.drv_init_registers	= rt2800mmio_init_registers,
 	.drv_get_txwi		= rt2800mmio_get_txwi,
 	.drv_get_dma_done	= rt2800mmio_get_dma_done,
-	.hw_get_chippkg		= rt2800pci_get_chippkg,
-	.hw_get_chipver		= rt2800pci_get_chipver,
-	.hw_get_chipeco		= rt2800pci_get_chipeco,
 };
 
 static const struct rt2x00lib_ops rt2800pci_rt2x00_ops = {
@@ -360,7 +353,6 @@ static const struct rt2x00lib_ops rt2800pci_rt2x00_ops = {
 	.gain_calibration	= rt2800_gain_calibration,
 	.vco_calibration	= rt2800_vco_calibration,
 	.watchdog		= rt2800_watchdog,
-	.update_survey		= rt2800_update_survey,
 	.start_queue		= rt2800mmio_start_queue,
 	.kick_queue		= rt2800mmio_kick_queue,
 	.stop_queue		= rt2800mmio_stop_queue,

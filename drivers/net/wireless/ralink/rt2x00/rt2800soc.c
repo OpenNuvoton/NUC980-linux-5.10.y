@@ -27,12 +27,6 @@
 #include "rt2800lib.h"
 #include "rt2800mmio.h"
 
-/* Needed to probe CHIP_VER register on MT7620 */
-#ifdef CONFIG_SOC_MT7620
-#include <asm/mach-ralink/ralink_regs.h>
-#include <asm/mach-ralink/mt7620.h>
-#endif
-
 /* Allow hardware encryption to be disabled. */
 static bool modparam_nohwcrypt;
 module_param_named(nohwcrypt, modparam_nohwcrypt, bool, 0444);
@@ -137,27 +131,6 @@ static int rt2800soc_write_firmware(struct rt2x00_dev *rt2x00dev,
 	return 0;
 }
 
-#ifdef CONFIG_SOC_MT7620
-static int rt2800soc_get_chippkg(void)
-{
-	return mt7620_get_pkg();
-}
-
-static int rt2800soc_get_chipver(void)
-{
-	return mt7620_get_chipver();
-}
-
-static int rt2800soc_get_chipeco(void)
-{
-	return mt7620_get_eco();
-}
-#else
-static int rt2800soc_get_chippkg(void) { return 0; }
-static int rt2800soc_get_chipver(void) { return 0; }
-static int rt2800soc_get_chipeco(void) { return 0; }
-#endif
-
 static const struct ieee80211_ops rt2800soc_mac80211_ops = {
 	.tx			= rt2x00mac_tx,
 	.start			= rt2x00mac_start,
@@ -200,9 +173,6 @@ static const struct rt2800_ops rt2800soc_rt2800_ops = {
 	.drv_init_registers	= rt2800mmio_init_registers,
 	.drv_get_txwi		= rt2800mmio_get_txwi,
 	.drv_get_dma_done	= rt2800mmio_get_dma_done,
-	.hw_get_chippkg		= rt2800soc_get_chippkg,
-	.hw_get_chipver		= rt2800soc_get_chipver,
-	.hw_get_chipeco		= rt2800soc_get_chipeco,
 };
 
 static const struct rt2x00lib_ops rt2800soc_rt2x00_ops = {
@@ -228,7 +198,6 @@ static const struct rt2x00lib_ops rt2800soc_rt2x00_ops = {
 	.gain_calibration	= rt2800_gain_calibration,
 	.vco_calibration	= rt2800_vco_calibration,
 	.watchdog		= rt2800_watchdog,
-	.update_survey		= rt2800_update_survey,
 	.start_queue		= rt2800mmio_start_queue,
 	.kick_queue		= rt2800mmio_kick_queue,
 	.stop_queue		= rt2800mmio_stop_queue,
@@ -269,17 +238,10 @@ static int rt2800soc_probe(struct platform_device *pdev)
 	return rt2x00soc_probe(pdev, &rt2800soc_ops);
 }
 
-static const struct of_device_id rt2880_wmac_match[] = {
-	{ .compatible = "ralink,rt2880-wmac" },
-	{},
-};
-MODULE_DEVICE_TABLE(of, rt2880_wmac_match);
-
 static struct platform_driver rt2800soc_driver = {
 	.driver		= {
 		.name		= "rt2800_wmac",
 		.mod_name	= KBUILD_MODNAME,
-		.of_match_table	= rt2880_wmac_match,
 	},
 	.probe		= rt2800soc_probe,
 	.remove		= rt2x00soc_remove,

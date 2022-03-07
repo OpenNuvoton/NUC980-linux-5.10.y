@@ -42,28 +42,11 @@
 			};
 		};
 
-		cpu0: cpu@0 {
-			capacity-dmips-mhz = <1024>;
-		};
-
-		cpu1: cpu@1 {
-			capacity-dmips-mhz = <1024>;
-		};
-
-		cpu2: cpu@2 {
-			capacity-dmips-mhz = <1024>;
-		};
-
-		cpu3: cpu@3 {
-			capacity-dmips-mhz = <1024>;
-		};
-
 		cpu4: cpu@100 {
 			device_type = "cpu";
 			compatible = "arm,cortex-a53";
 			reg = <0x0 0x100>;
 			enable-method = "psci";
-			capacity-dmips-mhz = <1024>;
 			next-level-cache = <&l2>;
 			clocks = <&scpi_dvfs 1>;
 			#cooling-cells = <2>;
@@ -74,7 +57,6 @@
 			compatible = "arm,cortex-a53";
 			reg = <0x0 0x101>;
 			enable-method = "psci";
-			capacity-dmips-mhz = <1024>;
 			next-level-cache = <&l2>;
 			clocks = <&scpi_dvfs 1>;
 			#cooling-cells = <2>;
@@ -85,7 +67,6 @@
 			compatible = "arm,cortex-a53";
 			reg = <0x0 0x102>;
 			enable-method = "psci";
-			capacity-dmips-mhz = <1024>;
 			next-level-cache = <&l2>;
 			clocks = <&scpi_dvfs 1>;
 			#cooling-cells = <2>;
@@ -96,7 +77,6 @@
 			compatible = "arm,cortex-a53";
 			reg = <0x0 0x103>;
 			enable-method = "psci";
-			capacity-dmips-mhz = <1024>;
 			next-level-cache = <&l2>;
 			clocks = <&scpi_dvfs 1>;
 			#cooling-cells = <2>;

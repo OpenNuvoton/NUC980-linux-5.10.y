@@ -98,9 +98,6 @@ static int rt2x00leds_register_led(struct rt2x00_dev *rt2x00dev,
 	led->led_dev.name = name;
 	led->led_dev.brightness = LED_OFF;
 
-	if (rt2x00_is_soc(rt2x00dev))
-		led->led_dev.brightness_set(&led->led_dev, LED_OFF);
-
 	retval = led_classdev_register(device, &led->led_dev);
 	if (retval) {
 		rt2x00_err(rt2x00dev, "Failed to register led handler\n");

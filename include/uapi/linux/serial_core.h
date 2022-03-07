@@ -279,4 +279,7 @@
 /* Freescale LINFlexD UART */
 #define PORT_LINFLEXUART	122
 
+/* Nuvoton NUC980 UART */
+#define PORT_NUC980	125
+
 #endif /* _UAPILINUX_SERIAL_CORE_H */

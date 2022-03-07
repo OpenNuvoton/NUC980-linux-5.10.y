@@ -374,6 +374,17 @@ config ARCH_EP93XX
 	help
 	  This enables support for the Cirrus EP93xx series of CPUs.
 
+config ARCH_NUC980
+	bool "Nuvoton NUC980 CPU"
+	select ARCH_REQUIRE_GPIOLIB
+	select CLKDEV_LOOKUP
+	select CPU_ARM926T
+	select CLKSRC_MMIO
+	select GENERIC_CLOCKEVENTS
+	select PINCTRL
+	help
+	  Support for Nuvoton NUC980 Series MPUs.
+
 config ARCH_FOOTBRIDGE
 	bool "FootBridge"
 	select CPU_SA110

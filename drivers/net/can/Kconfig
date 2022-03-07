@@ -168,6 +168,7 @@ config PCH_CAN
 	  This driver can access CAN bus.
 
 source "drivers/net/can/c_can/Kconfig"
+source "drivers/net/can/nuc980_can/Kconfig"
 source "drivers/net/can/cc770/Kconfig"
 source "drivers/net/can/ifi_canfd/Kconfig"
 source "drivers/net/can/m_can/Kconfig"

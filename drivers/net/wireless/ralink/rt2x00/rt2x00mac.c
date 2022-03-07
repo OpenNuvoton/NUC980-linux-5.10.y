@@ -317,15 +317,6 @@ int rt2x00mac_config(struct ieee80211_hw *hw, u32 changed)
 		return 0;
 
 	/*
-	 * To provide correct survey data for survey-based ACS algorithm
-	 * we have to save survey data for current channel before switching.
-	 */
-	if (rt2x00dev->ops->lib->update_survey &&
-	    (changed & IEEE80211_CONF_CHANGE_CHANNEL)) {
-		rt2x00dev->ops->lib->update_survey(rt2x00dev);
-	}
-
-	/*
 	 * Some configuration parameters (e.g. channel and antenna values) can
 	 * only be set when the radio is enabled, but do require the RX to
 	 * be off. During this period we should keep link tuning enabled,

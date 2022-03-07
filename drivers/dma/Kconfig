@@ -194,6 +194,21 @@ config EP93XX_DMA
 	help
 	  Enable support for the Cirrus Logic EP93xx M2P/M2M DMA controller.
 
+config NUC980_DMA
+        bool "NUC980 DMA support"
+        depends on ARCH_NUC980
+        select DMA_ENGINE
+        help
+          Enable support for the NUC980 M2M/M2P/P2M DMA controller.
+
+config NUC980_DMA_M2M
+        bool "M2M Demo Code"
+        depends on ARCH_NUC980
+	depends on NUC980_DMA
+        select DMA_ENGINE
+        help
+          Enable support for the NUC980 M2M DMA controller.
+
 config FSL_DMA
 	tristate "Freescale Elo series DMA support"
 	depends on FSL_SOC

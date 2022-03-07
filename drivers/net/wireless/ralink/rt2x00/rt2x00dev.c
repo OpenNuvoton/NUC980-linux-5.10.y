@@ -990,12 +990,7 @@ static void rt2x00lib_rate(struct ieee80211_rate *entry,
 
 void rt2x00lib_set_mac_address(struct rt2x00_dev *rt2x00dev, u8 *eeprom_mac_addr)
 {
-	struct rt2x00_platform_data *pdata;
 	const char *mac_addr;
-
-	pdata = rt2x00dev->dev->platform_data;
-	if (pdata && pdata->mac_address)
-		ether_addr_copy(eeprom_mac_addr, pdata->mac_address);
 
 	mac_addr = of_get_mac_address(rt2x00dev->dev->of_node);
 	if (!IS_ERR(mac_addr))
@@ -1016,32 +1011,6 @@ static int rt2x00lib_probe_hw_modes(struct rt2x00_dev *rt2x00dev,
 	struct ieee80211_rate *rates;
 	unsigned int num_rates;
 	unsigned int i;
-#ifdef CONFIG_OF
-	struct device_node *np = rt2x00dev->dev->of_node;
-	unsigned int enabled;
-	if (!of_property_read_u32(np, "ralink,2ghz",
-                                          &enabled) && !enabled)
-		spec->supported_bands &= ~SUPPORT_BAND_2GHZ;
-	if (!of_property_read_u32(np, "ralink,5ghz",
-                                          &enabled) && !enabled)
-		spec->supported_bands &= ~SUPPORT_BAND_5GHZ;
-#endif /* CONFIG_OF */
-
-	if (rt2x00dev->dev->platform_data) {
-		struct rt2x00_platform_data *pdata;
-
-		pdata = rt2x00dev->dev->platform_data;
-		if (pdata->disable_2ghz)
-			spec->supported_bands &= ~SUPPORT_BAND_2GHZ;
-		if (pdata->disable_5ghz)
-			spec->supported_bands &= ~SUPPORT_BAND_5GHZ;
-	}
-
-	if ((spec->supported_bands & SUPPORT_BAND_BOTH) == 0) {
-		rt2x00_err(rt2x00dev, "No supported bands\n");
-		return -EINVAL;
-	}
-
 
 	num_rates = 0;
 	if (spec->supported_rates & SUPPORT_RATE_CCK)
@@ -1056,12 +1025,6 @@ static int rt2x00lib_probe_hw_modes(struct rt2x00_dev *rt2x00dev,
 	rates = kcalloc(num_rates, sizeof(*rates), GFP_KERNEL);
 	if (!rates)
 		goto exit_free_channels;
-
-	rt2x00dev->chan_survey =
-		kcalloc(spec->num_channels, sizeof(struct rt2x00_chan_survey),
-			GFP_KERNEL);
-	if (!rt2x00dev->chan_survey)
-		goto exit_free_rates;
 
 	/*
 	 * Initialize Rate list.
@@ -1114,8 +1077,6 @@ static int rt2x00lib_probe_hw_modes(struct rt2x00_dev *rt2x00dev,
 
 	return 0;
 
- exit_free_rates:
-	kfree(rates);
  exit_free_channels:
 	kfree(channels);
 	rt2x00_err(rt2x00dev, "Allocation ieee80211 modes failed\n");
@@ -1136,19 +1097,6 @@ static void rt2x00lib_remove_hw(struct rt2x00_dev *rt2x00dev)
 
 	kfree(rt2x00dev->spec.channels_info);
 }
-
-static const struct ieee80211_tpt_blink rt2x00_tpt_blink[] = {
-	{ .throughput = 0 * 1024, .blink_time = 334 },
-	{ .throughput = 1 * 1024, .blink_time = 260 },
-	{ .throughput = 2 * 1024, .blink_time = 220 },
-	{ .throughput = 5 * 1024, .blink_time = 190 },
-	{ .throughput = 10 * 1024, .blink_time = 170 },
-	{ .throughput = 25 * 1024, .blink_time = 150 },
-	{ .throughput = 54 * 1024, .blink_time = 130 },
-	{ .throughput = 120 * 1024, .blink_time = 110 },
-	{ .throughput = 265 * 1024, .blink_time = 80 },
-	{ .throughput = 586 * 1024, .blink_time = 50 },
-};
 
 static int rt2x00lib_probe_hw(struct rt2x00_dev *rt2x00dev)
 {
@@ -1230,10 +1178,6 @@ static int rt2x00lib_probe_hw(struct rt2x00_dev *rt2x00dev)
 	RT2X00_TASKLET_INIT(autowake_tasklet);
 
 #undef RT2X00_TASKLET_INIT
-
-	ieee80211_create_tpt_led_trigger(rt2x00dev->hw,
-		IEEE80211_TPT_LEDTRIG_FL_RADIO, rt2x00_tpt_blink,
-		ARRAY_SIZE(rt2x00_tpt_blink));
 
 	/*
 	 * Register HW.
@@ -1369,7 +1313,7 @@ static inline void rt2x00lib_set_if_combinations(struct rt2x00_dev *rt2x00dev)
 	 */
 	if_limit = &rt2x00dev->if_limits_ap;
 	if_limit->max = rt2x00dev->ops->max_ap_intf;
-	if_limit->types = BIT(NL80211_IFTYPE_AP) | BIT(NL80211_IFTYPE_STATION);
+	if_limit->types = BIT(NL80211_IFTYPE_AP);
 #ifdef CONFIG_MAC80211_MESH
 	if_limit->types |= BIT(NL80211_IFTYPE_MESH_POINT);
 #endif

@@ -28,11 +28,6 @@
 #include <linux/netlink.h>
 #include <linux/spinlock.h>
 #include <linux/interrupt.h>
-
-#ifdef CONFIG_NF_CONNTRACK_CHAIN_EVENTS
-#include <linux/notifier.h>
-#endif
-
 #include <linux/slab.h>
 #include <linux/siphash.h>
 
@@ -710,22 +705,14 @@ static size_t ctnetlink_nlmsg_size(const struct nf_conn *ct)
 	       ;
 }
 
-#ifdef CONFIG_NF_CONNTRACK_CHAIN_EVENTS
-static int ctnetlink_conntrack_event(struct notifier_block *this,
-                           unsigned long events, void *ptr)
-#else
 static int
 ctnetlink_conntrack_event(unsigned int events, struct nf_ct_event *item)
-#endif
 {
 	const struct nf_conntrack_zone *zone;
 	struct net *net;
 	struct nlmsghdr *nlh;
 	struct nfgenmsg *nfmsg;
 	struct nlattr *nest_parms;
-#ifdef CONFIG_NF_CONNTRACK_CHAIN_EVENTS
-	struct nf_ct_event *item = (struct nf_ct_event *)ptr;
-#endif
 	struct nf_conn *ct = item->ct;
 	struct sk_buff *skb;
 	unsigned int type;
@@ -3800,15 +3787,9 @@ static int ctnetlink_stat_exp_cpu(struct net *net, struct sock *ctnl,
 }
 
 #ifdef CONFIG_NF_CONNTRACK_EVENTS
-#ifdef CONFIG_NF_CONNTRACK_CHAIN_EVENTS
-static struct notifier_block ctnl_notifier = {
-	.notifier_call = ctnetlink_conntrack_event,
-};
-#else
 static struct nf_ct_event_notifier ctnl_notifier = {
 	.fcn = ctnetlink_conntrack_event,
 };
-#endif
 
 static struct nf_exp_event_notifier ctnl_notifier_exp = {
 	.fcn = ctnetlink_expect_event,

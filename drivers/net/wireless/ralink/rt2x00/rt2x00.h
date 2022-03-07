@@ -28,7 +28,6 @@
 #include <linux/average.h>
 #include <linux/usb.h>
 #include <linux/clk.h>
-#include <linux/rt2x00_platform.h>
 
 #include <net/mac80211.h>
 
@@ -180,15 +179,6 @@ struct rf_channel {
 	u32 rf2;
 	u32 rf3;
 	u32 rf4;
-};
-
-/*
- * Information structure for channel survey.
- */
-struct rt2x00_chan_survey {
-	u64 time_idle;
-	u64 time_busy;
-	u64 time_ext_busy;
 };
 
 /*
@@ -408,7 +398,6 @@ struct hw_mode_spec {
 	unsigned int supported_bands;
 #define SUPPORT_BAND_2GHZ	0x00000001
 #define SUPPORT_BAND_5GHZ	0x00000002
-#define SUPPORT_BAND_BOTH	(SUPPORT_BAND_2GHZ | SUPPORT_BAND_5GHZ)
 
 	unsigned int supported_rates;
 #define SUPPORT_RATE_CCK	0x00000001
@@ -576,7 +565,6 @@ struct rt2x00lib_ops {
 	 * Data queue handlers.
 	 */
 	void (*watchdog) (struct rt2x00_dev *rt2x00dev);
-	void (*update_survey) (struct rt2x00_dev *rt2x00dev);
 	void (*start_queue) (struct data_queue *queue);
 	void (*kick_queue) (struct data_queue *queue);
 	void (*stop_queue) (struct data_queue *queue);
@@ -764,7 +752,6 @@ struct rt2x00_dev {
 	 */
 	struct ieee80211_hw *hw;
 	struct ieee80211_supported_band bands[NUM_NL80211_BANDS];
-	struct rt2x00_chan_survey *chan_survey;
 	enum nl80211_band curr_band;
 	int curr_freq;
 

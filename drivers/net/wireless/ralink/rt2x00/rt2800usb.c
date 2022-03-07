@@ -628,10 +628,6 @@ static int rt2800usb_probe_hw(struct rt2x00_dev *rt2x00dev)
 	return 0;
 }
 
-static int rt2800usb_get_chippkg(void) { return 0; }
-static int rt2800usb_get_chipver(void) { return 0; }
-static int rt2800usb_get_chipeco(void) { return 0; }
-
 static const struct ieee80211_ops rt2800usb_mac80211_ops = {
 	.tx			= rt2x00mac_tx,
 	.start			= rt2x00mac_start,
@@ -675,9 +671,6 @@ static const struct rt2800_ops rt2800usb_rt2800_ops = {
 	.drv_init_registers	= rt2800usb_init_registers,
 	.drv_get_txwi		= rt2800usb_get_txwi,
 	.drv_get_dma_done	= rt2800usb_get_dma_done,
-	.hw_get_chippkg		= rt2800usb_get_chippkg,
-	.hw_get_chipver		= rt2800usb_get_chipver,
-	.hw_get_chipeco		= rt2800usb_get_chipeco,
 };
 
 static const struct rt2x00lib_ops rt2800usb_rt2x00_ops = {

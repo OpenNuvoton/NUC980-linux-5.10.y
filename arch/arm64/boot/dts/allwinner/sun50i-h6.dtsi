@@ -16,16 +16,6 @@
 	#address-cells = <1>;
 	#size-cells = <1>;
 
-	ac200_pwm_clk: ac200_clk {
-		compatible = "pwm-clock";
-		#clock-cells = <0>;
-		clock-frequency = <24000000>;
-		pinctrl-names = "default";
-		pinctrl-0 = <&pwm1_pin>;
-		pwms = <&pwm 1 42 0>;
-		status = "disabled";
-	};
-
 	cpus {
 		#address-cells = <1>;
 		#size-cells = <0>;
@@ -100,6 +90,7 @@
 
 	timer {
 		compatible = "arm,armv8-timer";
+		arm,no-tick-in-suspend;
 		interrupts = <GIC_PPI 13
 			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>,
 			     <GIC_PPI 14
@@ -110,25 +101,7 @@
 			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
 	};
 
-	sound_hdmi: sound {
-		compatible = "simple-audio-card";
-		simple-audio-card,format = "i2s";
-		simple-audio-card,name = "allwinner-hdmi";
-		simple-audio-card,mclk-fs = <128>;
-		simple-audio-card,frame-inversion;
-
-		simple-audio-card,codec {
-			sound-dai = <&hdmi>;
-		};
-
-		simple-audio-card,cpu {
-			sound-dai = <&i2s1>;
-			dai-tdm-slot-num = <2>;
-			dai-tdm-slot-width = <32>;
-		};
-	};
-
-	soc: soc {
+	soc {
 		compatible = "simple-bus";
 		#address-cells = <1>;
 		#size-cells = <1>;
@@ -180,17 +153,6 @@
 			};
 		};
 
-		deinterlace: deinterlace@1420000 {
-			compatible = "allwinner,sun50i-h6-deinterlace";
-			reg = <0x01420000 0x2000>;
-			clocks = <&ccu CLK_BUS_DEINTERLACE>,
-				 <&ccu CLK_DEINTERLACE>,
-				 <&ccu CLK_MBUS_DEINTERLACE>;
-			clock-names = "bus", "mod", "ram";
-			resets = <&ccu RST_BUS_DEINTERLACE>;
-			interrupts = <GIC_SPI 79 IRQ_TYPE_LEVEL_HIGH>;
-		};
-
 		video-codec@1c0e000 {
 			compatible = "allwinner,sun50i-h6-video-engine";
 			reg = <0x01c0e000 0x2000>;
@@ -214,8 +176,6 @@
 			clocks = <&ccu CLK_GPU>, <&ccu CLK_BUS_GPU>;
 			clock-names = "core", "bus";
 			resets = <&ccu RST_BUS_GPU>;
-			operating-points-v2 = <&gpu_opp_table>;
-			#cooling-cells = <2>;
 			status = "disabled";
 		};
 
@@ -309,10 +269,6 @@
 			cpu_speed_grade: cpu-speed-grade@1c {
 				reg = <0x1c 0x4>;
 			};
-
-			ephy_calib: ephy_calib@2c {
-				reg = <0x2c 0x2>;
-			};
 		};
 
 		watchdog: watchdog@30090a0 {
@@ -357,18 +313,6 @@
 				drive-strength = <40>;
 			};
 
-			i2c3_pins: i2c3-pins {
-				pins = "PB17", "PB18";
-				function = "i2c3";
-			};
-
-			ext_rmii_pins: rmii_pins {
-				pins = "PA0", "PA1", "PA2", "PA3", "PA4",
-				       "PA5", "PA6", "PA7", "PA8", "PA9";
-				function = "emac";
-				drive-strength = <40>;
-			};
-
 			hdmi_pins: hdmi-pins {
 				pins = "PH8", "PH9", "PH10";
 				function = "hdmi";
@@ -404,11 +348,6 @@
 				function = "mmc1";
 				drive-strength = <30>;
 				bias-pull-up;
-			};
-
-			pwm1_pin: pwm1-pin {
-				pins = "PB19";
-				function = "pwm1";
 			};
 
 			mmc2_pins: mmc2-pins {
@@ -653,31 +592,6 @@
 			#size-cells = <0>;
 		};
 
-		i2c3: i2c@5002c00 {
-			compatible = "allwinner,sun6i-a31-i2c";
-			reg = <0x05002c00 0x400>;
-			interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
-			clocks = <&ccu CLK_BUS_I2C3>;
-			resets = <&ccu RST_BUS_I2C3>;
-			pinctrl-names = "default";
-			pinctrl-0 = <&i2c3_pins>;
-			status = "disabled";
-			#address-cells = <1>;
-			#size-cells = <0>;
-
-			ac200: mfd@10 {
-				compatible = "x-powers,ac200";
-				reg = <0x10>;
-				clocks = <&ac200_pwm_clk>;
-
-				ac200_ephy: phy {
-					compatible = "x-powers,ac200-ephy";
-					nvmem-cells = <&ephy_calib>;
-					nvmem-cell-names = "ephy_calib";
-				};
-			};
-		};
-
 		emac: ethernet@5020000 {
 			compatible = "allwinner,sun50i-h6-emac",
 				     "allwinner,sun50i-a64-emac";
@@ -711,19 +625,6 @@
 			pinctrl-names = "default";
 			pinctrl-0 = <&spdif_tx_pin>;
 			status = "disabled";
-		};
-
-		i2s1: i2s@5091000 {
-			#sound-dai-cells = <0>;
-			compatible = "allwinner,sun50i-h6-i2s";
-			reg = <0x05091000 0x1000>;
-			interrupts = <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>;
-			clocks = <&ccu CLK_BUS_I2S1>, <&ccu CLK_I2S1>;
-			clock-names = "apb", "mod";
-			dmas = <&dma 4>;
-			resets = <&ccu RST_BUS_I2S1>;
-			dma-names = "tx";
-			allwinner,playback-channels = <8>;
 		};
 
 		usb2otg: usb@5100000 {
@@ -845,7 +746,6 @@
 		};
 
 		hdmi: hdmi@6000000 {
-			#sound-dai-cells = <0>;
 			compatible = "allwinner,sun50i-h6-dw-hdmi";
 			reg = <0x06000000 0x10000>;
 			reg-io-width = <1>;
@@ -1121,61 +1021,6 @@
 			polling-delay-passive = <0>;
 			polling-delay = <0>;
 			thermal-sensors = <&ths 1>;
-
-			trips {
-				gpu_alert: gpu-alert {
-					temperature = <85000>;
-					hysteresis = <2000>;
-					type = "passive";
-				};
-
-				gpu-crit {
-					temperature = <100000>;
-					hysteresis = <0>;
-					type = "critical";
-				};
-			};
-
-			cooling-maps {
-				map0 {
-					trip = <&gpu_alert>;
-					cooling-device = <&gpu THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
-				};
-			};
-		};
-	};
-
-	gpu_opp_table: gpu-opp-table {
-		compatible = "operating-points-v2";
-
-		opp@216000000 {
-			opp-hz = /bits/ 64 <216000000>;
-			opp-microvolt = <810000 810000 1200000>;
-		};
-
-		opp@312000000 {
-			opp-hz = /bits/ 64 <312000000>;
-			opp-microvolt = <810000 810000 1200000>;
-		};
-
-		opp@408000000 {
-			opp-hz = /bits/ 64 <408000000>;
-			opp-microvolt = <840000 840000 1200000>;
-		};
-
-		opp@540000000 {
-			opp-hz = /bits/ 64 <540000000>;
-			opp-microvolt = <910000 910000 1200000>;
-		};
-
-		opp@624000000 {
-			opp-hz = /bits/ 64 <624000000>;
-			opp-microvolt = <950000 950000 1200000>;
-		};
-
-		opp@756000000 {
-			opp-hz = /bits/ 64 <756000000>;
-			opp-microvolt = <1040000 1040000 1200000>;
 		};
 	};
 };

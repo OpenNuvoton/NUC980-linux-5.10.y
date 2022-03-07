@@ -365,9 +365,6 @@
 
 &uart2 {
 	status = "okay";
-
-	/delete-property/ dmas;
-	/delete-property/ dma-names;
 };
 
 &u2phy {
@@ -387,27 +384,8 @@
 	status = "okay";
 };
 
-&u3phy {
-	status = "okay";
-};
-
-&u3phy_utmi {
-	status = "okay";
-};
-
-&u3phy_pipe {
-	status = "okay";
-};
-
-&u3phy {
-	status = "okay";
-};
-
-&u3phy_utmi {
-	status = "okay";
-};
-
-&u3phy_pipe {
+&usbdrd3 {
+	dr_mode = "host";
 	status = "okay";
 };
 
@@ -416,24 +394,6 @@
 };
 
 &usb_host0_ohci {
-	status = "okay";
-};
-
-&usbdrd3 {
-	status = "okay";
-};
-
-&usbdrd_dwc3 {
-	dr_mode = "host";
-	status = "okay";
-};
-
-&usbdrd3 {
-	status = "okay";
-};
-
-&usbdrd_dwc3 {
-	dr_mode = "host";
 	status = "okay";
 };
 

@@ -12484,13 +12484,6 @@ T:	git git://git.kernel.org/pub/scm/linux/kernel/git/aia21/ntfs.git
 F:	Documentation/filesystems/ntfs.rst
 F:	fs/ntfs/
 
-NTFS3 FILESYSTEM
-M:	Konstantin Komarov <almaz.alexandrovich@paragon-software.com>
-S:	Supported
-W:	http://www.paragon-software.com/
-F:	Documentation/filesystems/ntfs3.rst
-F:	fs/ntfs3/
-
 NUBUS SUBSYSTEM
 M:	Finn Thain <fthain@telegraphics.com.au>
 L:	linux-m68k@lists.linux-m68k.org
@@ -17639,13 +17632,6 @@ S:	Maintained
 W:	http://sourceforge.net/projects/tlan/
 F:	Documentation/networking/device_drivers/ethernet/ti/tlan.rst
 F:	drivers/net/ethernet/ti/tlan.*
-
-TM1628 LED CONTROLLER DRIVER
-M:	Heiner Kallweit <hkallweit1@gmail.com>
-S:	Maintained
-F:	Documentation/devicetree/bindings/auxdisplay/titanmec,tm1628.yaml
-F:	Documentation/ABI/testing/sysfs-devices-auxdisplay-tm1628
-F:	drivers/auxdisplay/tm1628.c
 
 TM6000 VIDEO4LINUX DRIVER
 M:	Mauro Carvalho Chehab <mchehab@kernel.org>
