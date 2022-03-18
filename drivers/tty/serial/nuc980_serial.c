@@ -48,6 +48,7 @@
 #include <mach/regs-pdma.h>
 #include <mach/sram.h>
 #include <linux/platform_data/dma-nuc980.h>
+#include <linux/pinctrl/consumer.h>
 
 
 #include "nuc980_serial.h"
@@ -353,6 +354,7 @@ static void nuc980_prepare_RX_dma(struct uart_nuc980_port *p)
 	struct nuc980_dma_config dma_crx;
 	struct nuc980_ip_rx_dma *pdma_rx = &(p->dma_rx);
 	dma_cookie_t cookie;
+	int ret;
 
 	serial_out(p, UART_REG_IER, (serial_in(p, UART_REG_IER)&~ RXPDMAEN));
 
@@ -361,10 +363,12 @@ static void nuc980_prepare_RX_dma(struct uart_nuc980_port *p)
 #ifndef USING_SRAM
 		//p->dest_mem_p.size = 256;
 		p->dest_mem_p.size = 4096*2;
-		p->dest_mem_p.vir_addr = (unsigned int)dma_alloc_writecombine(NULL,
-		                         PAGE_ALIGN(p->dest_mem_p.size),
-		                         &(p->dest_mem_p.phy_addr),
-		                         GFP_KERNEL);
+		p->dest_mem_p.vir_addr = (u64)(kmalloc((UART_RX_BUF_SIZE * 2), GFP_KERNEL));
+		p->dest_mem_p.phy_addr = dma_map_single(pdma_rx->chan_rx->device->dev, (void *)p->dest_mem_p.vir_addr, (UART_RX_BUF_SIZE * 2), DMA_FROM_DEVICE);
+                ret = dma_mapping_error(pdma_rx->chan_rx->device->dev, p->dest_mem_p.phy_addr);
+                if (ret)
+                        dev_err(p->port.dev, "dest mapping error.\n");
+
 #else
 		p->dest_mem_p.size = 256; //set to 256 bytes
 		p->dest_mem_p.vir_addr =(u32)sram_alloc(p->dest_mem_p.size, &(p->dest_mem_p.phy_addr));
@@ -417,13 +421,15 @@ static void nuc980_prepare_TX_dma(struct uart_nuc980_port *p)
 	struct nuc980_ip_tx_dma *pdma_tx = &(p->dma_tx);
 	dma_cookie_t cookie;
 	struct circ_buf *xmit = &p->port.state->xmit;
+	int ret;
 
 	if(p->src_mem_p.size == 0) {
 		p->src_mem_p.size = UART_XMIT_SIZE;
-		p->src_mem_p.vir_addr = (unsigned int)dma_alloc_writecombine(NULL,
-		                        PAGE_ALIGN(p->src_mem_p.size),
-		                        &(p->src_mem_p.phy_addr),
-		                        GFP_KERNEL);
+		p->src_mem_p.vir_addr = (u64)(kmalloc(p->src_mem_p.size, GFP_KERNEL));
+		p->src_mem_p.phy_addr = dma_map_single(pdma_tx->chan_tx->device->dev, (void *)p->src_mem_p.vir_addr, p->src_mem_p.size, DMA_TO_DEVICE);
+                ret = dma_mapping_error(pdma_tx->chan_tx->device->dev, p->src_mem_p.phy_addr);
+                if (ret)
+                        dev_err(p->port.dev, "src mapping error.\n");
 	}
 
 	p->tx_dma_len = uart_circ_chars_pending(xmit);
@@ -956,13 +962,13 @@ static void nuc980serial_shutdown(struct uart_port *port)
 #else
 		if(up->dest_mem_p.size != 0)
 		{
-			dma_free_writecombine(NULL, up->dest_mem_p.size, (void *)up->dest_mem_p.vir_addr, up->dest_mem_p.phy_addr);
+			kfree((void *)up->dest_mem_p.vir_addr);
 		}
 #endif
 
 		if(up->src_mem_p.size != 0)
 		{
-			dma_free_writecombine(NULL, up->src_mem_p.size, (void *)up->src_mem_p.vir_addr, up->src_mem_p.phy_addr);
+			kfree((void *)up->src_mem_p.vir_addr);
 		}
 
 		up->Tx_pdma_busy_flag = 0;

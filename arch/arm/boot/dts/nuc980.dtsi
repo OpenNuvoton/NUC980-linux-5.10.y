@@ -10,9 +10,10 @@
  * http://www.opensource.org/licenses/gpl-license.html
  * http://www.gnu.org/copyleft/gpl.html
  */
-/include/ "skeleton.dtsi"
 
 / {
+	#address-cells = <1>;
+	#size-cells = <1>;
 	model = "Nuvoton NUC980 family SoC";
 	compatible = "nuvoton,nuc980";
 	interrupt-parent = <&aic>;
