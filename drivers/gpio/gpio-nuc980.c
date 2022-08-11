@@ -130,6 +130,7 @@ int nuc980_gpio_core_get(struct gpio_chip *gc, unsigned gpio_num)
 	const struct gpio_port *port;
 	ENTRY();
 	port = nuc980_gpio_cla_port(gpio_num, &group_num, &port_num);
+
 	LEAVE();
 	return GPIO_PIN_DATA(group_num,port_num);
 }
@@ -253,8 +254,8 @@ static int nuc980_gpio_core_to_irq(struct gpio_chip *chip, unsigned offset)
 	return irqno;
 }
 
-static struct gpio_chip nuc980_gpio_port = {
-	.label = "nuc980_gpio_port",
+static struct gpio_chip nuc980_gpio = {
+	.label = "gpio-nuc980",
 	.owner = THIS_MODULE,
 	.direction_input = nuc980_gpio_core_direction_in,
 	.get = nuc980_gpio_core_get,
@@ -265,7 +266,18 @@ static struct gpio_chip nuc980_gpio_port = {
 	.to_irq = nuc980_gpio_core_to_irq,
 	.base = 0,
 	.ngpio = NUMGPIO,
+
 };
+
+struct nuc980_gpio_port {
+	void __iomem *base;
+	int id;
+	int irq;
+	struct irq_domain *domain;
+	struct gpio_chip gc;
+	struct device *dev;
+};
+
 
 
 #ifndef CONFIG_USE_OF
@@ -603,13 +615,27 @@ static int nuc980_enable_eint(uint32_t flag,struct platform_device *pdev)
 	}
 	return 0;
 }
+
+static int nuc980_gpio_of_xlate(struct gpio_chip *gc,
+                             const struct of_phandle_args *gpiospec,
+                             u32 *flags)
+{
+
+        if (gpiospec->args[0] > IRQ_GPIO_END)
+                return -EINVAL;
+
+        if (flags)
+                *flags = gpiospec->args[1];
+
+	return gpiospec->args[0];
+}
+
 #endif
 
 static int nuc980_gpio_probe(struct platform_device *pdev)
 {
 	int err;
 	struct clk *clk;
-
 #ifndef CONFIG_USE_OF
 	if(pdev->id == 0)
 #else
@@ -628,9 +654,11 @@ static int nuc980_gpio_probe(struct platform_device *pdev)
 		clk_enable(clk);
 #ifdef CONFIG_USE_OF
 		irq_domain_add_legacy(np, IRQ_GPIO_END-IRQ_GPIO_START, IRQ_GPIO_START, 0,&irq_domain_simple_ops, NULL);
+		nuc980_gpio.of_node = pdev->dev.of_node;
+		nuc980_gpio.of_xlate = nuc980_gpio_of_xlate;
+		nuc980_gpio.of_gpio_n_cells = 2;
 #endif
-//		nuc980_gpio_port.dev = &pdev->dev; //schung
-		err = gpiochip_add(&nuc980_gpio_port);
+		err = gpiochip_add(&nuc980_gpio);
 		if (err < 0) {
 			goto err_nuc980_gpio_port;
 		}
@@ -676,7 +704,7 @@ static int nuc980_gpio_remove(struct platform_device *pdev)
 	clk_disable(clk);
 
 	if (gpio_ba) {
-		gpiochip_remove(&nuc980_gpio_port);
+		gpiochip_remove(&nuc980_gpio);
 	}
 
 	return 0;

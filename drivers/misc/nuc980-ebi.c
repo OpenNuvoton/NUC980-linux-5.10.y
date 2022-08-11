@@ -113,11 +113,6 @@ static long ebi_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 }
 static int ebi_open(struct inode *inode, struct file *filp)
 {
-#ifndef CONFIG_USE_OF
-	struct pinctrl_state *s=NULL;
-	int ret;
-#endif
-
 	ENTRY();
 	filp->private_data = ebi;
 	ebi->hclk = clk_get(NULL, "ebi_hclk");
@@ -128,33 +123,10 @@ static int ebi_open(struct inode *inode, struct file *filp)
 	clk_prepare(ebi->hclk);
 	clk_enable(ebi->hclk);
 
-#ifndef CONFIG_USE_OF
-	switch(ebi->bank) {
-	case 0:
-		s = pinctrl_lookup_state(ebi->pinctrl, "ebi-16bit-0");  //ebi 16bit cs0
-		break;
-	case 1:
-		s = pinctrl_lookup_state(ebi->pinctrl, "ebi-16bit-2");  //ebi 16bit cs1
-		break;
-	case 2:
-		s = pinctrl_lookup_state(ebi->pinctrl, "ebi-16bit-4");  //ebi 16bit cs2
-		break;
-	};
-	if (IS_ERR(s)) {
-		printk("pinctrl_lookup_state err\n");
-		return -EPERM;
-	}
-
-	if((ret = pinctrl_select_state(ebi->pinctrl, s)) < 0) {
-		printk("pinctrl_select_state err\n");
-		return ret;
-	}
-#endif
-
 	LEAVE();
 	return 0;
 }
-//static unsigned int ebi_poll(struct file *filp, poll_table *wait){return 0;}
+
 static ssize_t ebi_read(struct file *filp, char __user *buf, size_t count, loff_t *f_pos)
 {
 	return 0;
@@ -186,33 +158,13 @@ static struct miscdevice ebi_dev[] = {
 	},
 };
 
-;
 static int ebi_mmap(struct file *filp, struct vm_area_struct * vma)
 {
 	struct ebi_dev *nuc980_ebi = (struct ebi_dev *)filp->private_data;
 	unsigned long pageFrameNo = 0, size;
 
-#if 0
-	unsigned long virt_addr,phys_addr;
-	static unsigned int physical_address;
-	static unsigned int virtual_address;
-	size = vma->vm_end - vma->vm_start;
 	ENTRY();
-	virt_addr = (unsigned long)dma_alloc_writecombine(NULL, size,
-	            (unsigned int *) &phys_addr,
-	            GFP_KERNEL);
-	pageFrameNo = __phys_to_pfn(phys_addr);
-	if (!virt_addr) {
-		printk(KERN_INFO "kmalloc() failed !\n");
-		return -EINVAL;
-	}
-	DEBUG("MMAP_KMALLOC : virt addr = 0x%08x, size = %d, %d\n",virt_addr, size, __LINE__);
-#else
-	DEBUG("mmap: nuc980_ebi->bank=0x%08x\n",nuc980_ebi->bank);
-	DEBUG("nuc980_ebi->base_addr=0x%08x\n",(unsigned int)nuc980_ebi->base_addr[nuc980_ebi->bank]);
 	pageFrameNo = __phys_to_pfn(nuc980_ebi->base_addr[nuc980_ebi->bank]);
-	ENTRY();
-#endif
 
 	size = vma->vm_end - vma->vm_start;
 	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
@@ -221,13 +173,6 @@ static int ebi_mmap(struct file *filp, struct vm_area_struct * vma)
 		printk(KERN_INFO "nuc980_mem_mmap() : remap_pfn_range() failed !\n");
 		return -EINVAL;
 	}
-
-	printk("EBI_BANK%d\n", nuc980_ebi->bank);
-	DEBUG("REG_EBI_CTL=0x%08x\n",__raw_readl(REG_EBI_CTL(nuc980_ebi->bank)));
-	DEBUG("REG_EBI_TCTL=0x%08x\n",__raw_readl(REG_EBI_TCTL(nuc980_ebi->bank)));
-	DEBUG("REG_MFP_GPA_H=0x%08x  REG_MFP_GPA_L=0x%08x\n",__raw_readl(REG_MFP_GPA_H),__raw_readl(REG_MFP_GPA_L));
-	DEBUG("REG_MFP_GPG_H=0x%08x  REG_MFP_GPG_L=0x%08x\n",__raw_readl(REG_MFP_GPG_H),__raw_readl(REG_MFP_GPG_L));
-	DEBUG("REG_MFP_GPC_H=0x%08x  REG_MFP_GPC_L=0x%08x\n",__raw_readl(REG_MFP_GPC_H),__raw_readl(REG_MFP_GPC_L));
 	LEAVE();
 	return 0;
 }
@@ -235,13 +180,15 @@ static int ebi_mmap(struct file *filp, struct vm_area_struct * vma)
 static int nuc980_ebi_probe(struct platform_device *pdev)
 {
 	struct ebi_dev *nuc980_ebi;
+	unsigned int ch;
 	ENTRY();
-	DEBUG("%s - pdev = %s\n", __func__, pdev->name);
+
+	dev_info(&pdev->dev, "NUC980 EBI\n");
+
 	nuc980_ebi = devm_kzalloc(&pdev->dev, sizeof(*nuc980_ebi), GFP_KERNEL);
 	if (!nuc980_ebi)
 		return -ENOMEM;
 
-	//nuc980_ebi->clk = devm_clk_get(&pdev->dev, NULL);
 	nuc980_ebi->clk = devm_clk_get(&pdev->dev, "ebi_hclk");
 	if (IS_ERR(nuc980_ebi->clk))
 		nuc980_ebi->clk = NULL;
@@ -251,16 +198,6 @@ static int nuc980_ebi_probe(struct platform_device *pdev)
 	misc_register(&ebi_dev[0]);
 	nuc980_ebi->pinctrl = devm_pinctrl_get(&pdev->dev);
 	nuc980_ebi->minor = MINOR(ebi_dev[0].minor);
-
-#ifdef CONFIG_OF
-	{
-		struct pinctrl *pinctrl;
-		pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
-		if (IS_ERR(pinctrl)) {
-			return PTR_ERR(pinctrl);
-		}
-	}
-#endif
 
 	DEBUG("nuc980_ebi->minor=%d\n",nuc980_ebi->minor);
 	ebi=nuc980_ebi;
@@ -272,7 +209,6 @@ static int nuc980_ebi_probe(struct platform_device *pdev)
 
 static int nuc980_ebi_remove(struct platform_device *pdev)
 {
-	//struct ebi_dev *nuc980_ebi = platform_get_drvdata(pdev);
 	ENTRY();
 	misc_deregister(&ebi_dev[0]);
 	LEAVE();

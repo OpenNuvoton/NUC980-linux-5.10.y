@@ -324,8 +324,6 @@ config VIDEO_BT866
 	  To compile this driver as a module, choose M here: the
 	  module will be called bt866.
 
-source "drivers/media/i2c/nuvoton/Kconfig"
-
 config VIDEO_KS0127
 	tristate "KS0127 video decoder"
 	depends on VIDEO_V4L2 && I2C
@@ -726,6 +724,18 @@ config VIDEO_APTINA_PLL
 
 config VIDEO_SMIAPP_PLL
 	tristate
+
+config VIDEO_NT99141
+        tristate "Novatek NT99141 sensor support"
+        depends on VIDEO_V4L2 && I2C
+        help
+           Novatek sensor support
+
+config VIDEO_HM1055
+        tristate "HiMax HM1055 sensor support"
+        depends on VIDEO_V4L2 && I2C
+        help
+           HiMax sensor support
 
 config VIDEO_HI556
 	tristate "Hynix Hi-556 sensor support"

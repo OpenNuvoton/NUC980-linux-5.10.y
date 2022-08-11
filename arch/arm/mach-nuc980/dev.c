@@ -449,24 +449,24 @@ struct platform_device nuc980_device_emac1 = {
 
 /* VIDEOIN0 */
 #if defined(CONFIG_VIDEO0_NUC980) || defined(CONFIG_VIDEO0_NUC980_MODULE)
-static struct resource nuc980_cap0_resource[] = {
+static struct resource nuc980_ccap0_resource[] = {
 	[0] = {
-		.start = NUC980_PA_CAP0,
-		.end = NUC980_PA_CAP0 + NUC980_SZ_CAP0 - 1,
+		.start = NUC980_PA_CCAP0,
+		.end = NUC980_PA_CCAP0 + NUC980_SZ_CCAP0 - 1,
 		.flags = IORESOURCE_MEM,
 	},
 	[1] = {
-		.start = IRQ_CAP0,
-		.end = IRQ_CAP0,
+		.start = IRQ_CCAP0,
+		.end = IRQ_CCAP0,
 		.flags = IORESOURCE_IRQ,
 	}
 };
 
-struct platform_device nuc980_device_cap0 = {
+struct platform_device nuc980_device_ccap0 = {
 	.name = "nuc980-videoin0",
 	.id = -1,
-	.num_resources = ARRAY_SIZE(nuc980_cap0_resource),
-	.resource = nuc980_cap0_resource,
+	.num_resources = ARRAY_SIZE(nuc980_ccap0_resource),
+	.resource = nuc980_ccap0_resource,
 };
 
 #endif
@@ -474,24 +474,24 @@ struct platform_device nuc980_device_cap0 = {
 
 /* VIDEOIN1 */
 #if defined(CONFIG_VIDEO1_NUC980) || defined(CONFIG_VIDEO1_NUC980_MODULE)
-static struct resource nuc980_cap1_resource[] = {
+static struct resource nuc980_ccap1_resource[] = {
 	[0] = {
-		.start = NUC980_PA_CAP1,
-		.end = NUC980_PA_CAP1 + NUC980_SZ_CAP1 - 1,
+		.start = NUC980_PA_CCAP1,
+		.end = NUC980_PA_CCAP1 + NUC980_SZ_CCAP1 - 1,
 		.flags = IORESOURCE_MEM,
 	},
 	[1] = {
-		.start = IRQ_CAP1,
-		.end = IRQ_CAP1,
+		.start = IRQ_CCAP1,
+		.end = IRQ_CCAP1,
 		.flags = IORESOURCE_IRQ,
 	}
 };
 
-struct platform_device nuc980_device_cap1 = {
+struct platform_device nuc980_device_ccap1 = {
 	.name = "nuc980-videoin1",
 	.id = -1,
-	.num_resources = ARRAY_SIZE(nuc980_cap1_resource),
-	.resource = nuc980_cap1_resource,
+	.num_resources = ARRAY_SIZE(nuc980_ccap1_resource),
+	.resource = nuc980_ccap1_resource,
 };
 
 #endif
@@ -546,34 +546,7 @@ static struct resource nuc980_dma_resource[] = {
 		.flags = IORESOURCE_IRQ,
 	}
 };
-
-struct nuc980_dma_chan_data nuc980_dma_channels[] = {
-	DMA_CHANNEL("ch0",  NUC980_VA_PDMA0 + 0x000, IRQ_PDMA0),
-	DMA_CHANNEL("ch1",  NUC980_VA_PDMA1 + 0x000, IRQ_PDMA1),
-	DMA_CHANNEL("ch2",  NUC980_VA_PDMA0 + 0x010, IRQ_PDMA0),
-	DMA_CHANNEL("ch3",  NUC980_VA_PDMA1 + 0x010, IRQ_PDMA1),
-	DMA_CHANNEL("ch4",  NUC980_VA_PDMA0 + 0x020, IRQ_PDMA0),
-	DMA_CHANNEL("ch5",  NUC980_VA_PDMA1 + 0x020, IRQ_PDMA1),
-	DMA_CHANNEL("ch6",  NUC980_VA_PDMA0 + 0x030, IRQ_PDMA0),
-	DMA_CHANNEL("ch7",  NUC980_VA_PDMA1 + 0x030, IRQ_PDMA1),
-	DMA_CHANNEL("ch8",  NUC980_VA_PDMA0 + 0x040, IRQ_PDMA0),
-	DMA_CHANNEL("ch9",  NUC980_VA_PDMA1 + 0x040, IRQ_PDMA1),
-	DMA_CHANNEL("ch10", NUC980_VA_PDMA0 + 0x050, IRQ_PDMA0),
-	DMA_CHANNEL("ch11", NUC980_VA_PDMA1 + 0x050, IRQ_PDMA1),
-	DMA_CHANNEL("ch12", NUC980_VA_PDMA0 + 0x060, IRQ_PDMA0),
-	DMA_CHANNEL("ch13", NUC980_VA_PDMA1 + 0x060, IRQ_PDMA1),
-	DMA_CHANNEL("ch14", NUC980_VA_PDMA0 + 0x070, IRQ_PDMA0),
-	DMA_CHANNEL("ch15", NUC980_VA_PDMA1 + 0x070, IRQ_PDMA1),
-	DMA_CHANNEL("ch16", NUC980_VA_PDMA0 + 0x080, IRQ_PDMA0),
-	DMA_CHANNEL("ch17", NUC980_VA_PDMA1 + 0x080, IRQ_PDMA1),
-	DMA_CHANNEL("ch18", NUC980_VA_PDMA0 + 0x090, IRQ_PDMA0),
-	DMA_CHANNEL("ch19", NUC980_VA_PDMA1 + 0x090, IRQ_PDMA1),
-};
-struct nuc980_dma_platform_data nuc980_dma_data = {
-	.channels               = nuc980_dma_channels,
-	.num_channels           = ARRAY_SIZE(nuc980_dma_channels),
-};
-
+extern struct nuc980_dma_platform_data nuc980_dma_data;
 
 static struct platform_device nuc980_device_dma = {
 	.name                   = "nuc980-dma",
@@ -1681,6 +1654,8 @@ static struct i2c_board_info __initdata nuc980_i2c_clients4[] = {
         {I2C_BOARD_INFO("cap1_gc0308", 0x21),},
 #endif
 
+	{I2C_BOARD_INFO("hm1055", 0x24),},
+
 };
 
 static struct gpiod_lookup_table nuc980_i2c_gpiod_table = {
@@ -1903,10 +1878,10 @@ static struct platform_device *nuc980_public_dev[] __initdata = {
 	&nuc980_device_wwdt,
 #endif
 #if defined(CONFIG_VIDEO0_NUC980) || defined(CONFIG_VIDEO0_NUC980_MODULE)
-	&nuc980_device_cap0,
+	&nuc980_device_ccap0,
 #endif
 #if defined(CONFIG_VIDEO1_NUC980) || defined(CONFIG_VIDEO1_NUC980_MODULE)
-	&nuc980_device_cap1,
+	&nuc980_device_ccap1,
 #endif
 #if defined(CONFIG_SND_SOC_NUC980) || defined(CONFIG_SND_SOC_NUC980_MODULE)
 	&nuc980_device_audio_pcm,

@@ -10,6 +10,15 @@ menuconfig V4L_PLATFORM_DRIVERS
 
 if V4L_PLATFORM_DRIVERS
 
+config VIDEO_NUC980_CAMERA
+        tristate "NUC980 camera controller support"
+        depends on MEDIA_CAMERA_SUPPORT
+        depends on VIDEO_DEV && I2C && VIDEO_V4L2 && MEDIA_CONTROLLER
+        select VIDEOBUF2_DMA_CONTIG
+        select V4L2_FWNODE
+        help
+          NUC980 camera
+
 source "drivers/media/platform/marvell-ccic/Kconfig"
 
 config VIDEO_VIA_CAMERA

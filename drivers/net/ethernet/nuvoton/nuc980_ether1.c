@@ -25,6 +25,7 @@
 #include <linux/spinlock.h>
 #include <linux/ctype.h>
 #include <linux/net_tstamp.h>
+#include <linux/pinctrl/consumer.h>
 
 #include <mach/map.h>
 #include <mach/regs-clock.h>
@@ -315,7 +316,7 @@ static struct sk_buff * get_new_skb(struct net_device *dev, u32 i) {
 	skb_reserve(skb, 2);
 	skb->dev = dev;
 
-	(ether->rdesc + i)->buffer = dma_map_single(&dev->dev, skb->data,
+	(ether->rdesc + i)->buffer = dma_map_single(&ether->pdev->dev, skb->data,
 							1520, DMA_FROM_DEVICE);
 	rx_skb[i] = skb;
 
@@ -328,10 +329,16 @@ static int nuc980_init_desc(struct net_device *dev)
 	struct nuc980_txbd  *tdesc;
 	struct nuc980_rxbd  *rdesc;
 	struct platform_device *pdev;
-	unsigned int i;
+	unsigned int i, ret;
 
 	ether = netdev_priv(dev);
 	pdev = ether->pdev;
+
+	ret = dma_coerce_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
+	if(ret) {
+		dev_err(&pdev->dev, "Failed to set DMA mask\n");
+		return -ENOMEM;
+	}
 
 	ether->tdesc = (struct nuc980_txbd *)
 			dma_alloc_coherent(&pdev->dev, sizeof(struct nuc980_txbd) * TX_DESC_SIZE,
@@ -465,7 +472,7 @@ static void nuc980_enable_mac_interrupt(struct net_device *dev)
 
 static void nuc980_get_and_clear_int(struct net_device *dev,
 							unsigned int *val, unsigned int mask)
-{
+{;
 	*val = __raw_readl( REG_MISTA) & mask;
 	__raw_writel(*val,  REG_MISTA);
 }
@@ -532,7 +539,7 @@ static void nuc980_reset_mac(struct net_device *dev)
 	nuc980_enable_cam_command(dev);
 	nuc980_enable_mac_interrupt(dev);
 
-	dev->trans_start = jiffies; /* prevent tx timeout */
+	dev->_tx->trans_start = jiffies; /* prevent tx timeout */
 
 	if (netif_queue_stopped(dev))
 		netif_wake_queue(dev);
@@ -639,7 +646,7 @@ static int nuc980_ether_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		return NETDEV_TX_BUSY;
 	}
 
-	txbd->buffer = dma_map_single(&dev->dev, skb->data,
+	txbd->buffer = dma_map_single(&ether->pdev->dev, skb->data,
 					skb->len, DMA_TO_DEVICE);
 
 //	tx_skb[ether->cur_tx]  = skb;
@@ -749,7 +756,7 @@ static int nuc980_poll(struct napi_struct *napi, int budget)
 			skb_reserve(skb, 2);
 			skb->dev = dev;
 
-			rxbd->buffer = dma_map_single(&dev->dev, skb->data,
+			rxbd->buffer = dma_map_single(&ether->pdev->dev, skb->data,
 							1520, DMA_FROM_DEVICE);
 
 			rx_skb[ether->cur_rx] = skb;
@@ -866,21 +873,6 @@ static void nuc980_ether_set_multicast_list(struct net_device *dev)
 	__raw_writel(rx_mode,  REG_CAMCMR);
 }
 
-static int nuc980_ether_ioctl(struct net_device *dev,
-						struct ifreq *ifr, int cmd)
-{
-	struct nuc980_ether *ether = netdev_priv(dev);
-	struct phy_device *phydev = ether->phy_dev;
-
-	if (!netif_running(dev))
-		return -EINVAL;
-
-	if (!phydev)
-		return -ENODEV;;
-
-	return phy_mii_ioctl(phydev, ifr, cmd);
-}
-
 static void nuc980_get_drvinfo(struct net_device *dev,
 					struct ethtool_drvinfo *info)
 {
@@ -888,28 +880,6 @@ static void nuc980_get_drvinfo(struct net_device *dev,
 	strlcpy(info->version, DRV_MODULE_VERSION, sizeof(info->version));
 	strlcpy(info->fw_version, "N/A", sizeof(info->fw_version));
 	strlcpy(info->bus_info, "N/A", sizeof(info->bus_info));
-}
-
-static int nuc980_get_settings(struct net_device *dev, struct ethtool_cmd *cmd)
-{
-	struct nuc980_ether *ether = netdev_priv(dev);
-	struct phy_device *phydev = ether->phy_dev;
-
-	if (NULL == phydev)
-		return -ENODEV;
-
-	return phy_ethtool_gset(phydev, cmd);
-}
-
-static int nuc980_set_settings(struct net_device *dev, struct ethtool_cmd *cmd)
-{
-	struct nuc980_ether *ether = netdev_priv(dev);
-	struct phy_device *phydev = ether->phy_dev;
-
-	if (NULL == phydev)
-		return -ENODEV;
-
-	return phy_ethtool_sset(phydev, cmd);
 }
 
 static u32 nuc980_get_msglevel(struct net_device *dev)
@@ -987,9 +957,26 @@ static int nuc980_get_ts_info(struct net_device *dev, struct ethtool_ts_info *in
 	return 0;
 }
 
+/* Just update variable, support in future */
+static int nuc980_change_mtu(struct net_device *dev, int new_mtu)
+{
+	//struct nuc980_ether *ether = netdev_priv(dev);
+	if(new_mtu < 0)
+		return -EINVAL;
+	else if(!netif_running(dev)) {
+		dev->mtu = new_mtu;
+		return 0;
+	}
+	else {
+		nuc980_ether_close(dev);
+		dev->mtu = new_mtu;
+		return nuc980_ether_open(dev);
+	}
+}
+
 static const struct ethtool_ops nuc980_ether_ethtool_ops = {
-	.get_settings	= nuc980_get_settings,
-	.set_settings	= nuc980_set_settings,
+	.get_link_ksettings = phy_ethtool_get_link_ksettings,
+	.set_link_ksettings = phy_ethtool_set_link_ksettings,
 	.get_drvinfo	= nuc980_get_drvinfo,
 	.get_msglevel	= nuc980_get_msglevel,
 	.set_msglevel	= nuc980_set_msglevel,
@@ -1012,9 +999,9 @@ static const struct net_device_ops nuc980_ether_netdev_ops = {
 	.ndo_get_stats		= nuc980_ether_stats,
 	.ndo_set_rx_mode	= nuc980_ether_set_multicast_list,
 	.ndo_set_mac_address	= nuc980_set_mac_address,
-	.ndo_do_ioctl		= nuc980_ether_ioctl,
+	.ndo_do_ioctl		= phy_do_ioctl_running,
 	.ndo_validate_addr	= eth_validate_addr,
-	.ndo_change_mtu		= eth_change_mtu,
+	.ndo_change_mtu		= nuc980_change_mtu,
 };
 
 static void __init get_mac_address(struct net_device *dev)
@@ -1056,7 +1043,6 @@ static int nuc980_mii_setup(struct net_device *dev)
 	ether->mii_bus->priv = ether;
 	ether->mii_bus->parent = &ether->pdev->dev;
 
-	ether->mii_bus->irq = kmalloc(sizeof(int) * PHY_MAX_ADDR, GFP_KERNEL);
 	if (!ether->mii_bus->irq) {
 		err = -ENOMEM;
 		dev_err(&pdev->dev, "kmalloc() failed\n");
@@ -1080,7 +1066,7 @@ static int nuc980_mii_setup(struct net_device *dev)
 		goto out3;
 	}
 
-	phydev = phy_connect(dev, dev_name(&phydev->dev),
+	phydev = phy_connect(dev, phydev_name(phydev),
 			     &adjust_link,
 			     PHY_INTERFACE_MODE_RMII);
 
@@ -1090,8 +1076,8 @@ static int nuc980_mii_setup(struct net_device *dev)
 		goto out3;
 	}
 
-	phydev->supported &= PHY_BASIC_FEATURES;
-	phydev->advertising = phydev->supported;
+	linkmode_copy(phydev->supported, PHY_BASIC_FEATURES);
+	linkmode_copy(phydev->advertising, phydev->supported);
 	ether->phy_dev = phydev;
 	ether->wol = 0;
 

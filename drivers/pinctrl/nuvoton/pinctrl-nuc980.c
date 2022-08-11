@@ -31,9 +31,7 @@
 #include <mach/map.h>
 #include <mach/regs-gcr.h>
 
-#include "core.h"
-
-#define DEBUG
+#include "../core.h"
 
 #define MAX_NB_GPIO_PER_BANK        16
 
@@ -161,10 +159,10 @@ const struct pinctrl_pin_desc nuc980_pins[] = {
  * @conf: reserved for GPIO mode
  */
 struct nuc980_pmx_pin {
-	uint32_t    bank;
-	uint32_t    pin;
-	uint32_t    func;
-	unsigned long  conf;
+	uint32_t	bank;
+	uint32_t	pin;
+	uint32_t	func;
+	unsigned long	conf;
 };
 
 /**
@@ -174,11 +172,10 @@ struct nuc980_pmx_pin {
  * @ngroups: the number of groups
  */
 struct nuc980_pmx_func {
-	const char  *name;
-	const char  **groups;
-	unsigned    ngroups;
+	const char	*name;
+	const char	**groups;
+	unsigned	ngroups;
 };
-
 
 /**
  * struct nuc980_pin_group - describes an NUC980 pin group
@@ -191,27 +188,27 @@ struct nuc980_pmx_func {
  *  elements in .pins so we can iterate over that array
  */
 struct nuc980_pin_group {
-	const char      *name;
-	struct nuc980_pmx_pin   *pins_conf;
-	unsigned int    *pins;
-	unsigned        npins;
+	const char	*name;
+	struct nuc980_pmx_pin	*pins_conf;
+	unsigned int	*pins;
+	unsigned	npins;
 };
 
 struct nuc980_pinctrl {
-	struct device       *dev;
-	struct pinctrl_dev  *pctl;
-	int         nbanks;
+	struct device	*dev;
+	struct pinctrl_dev *pctldev;
+	int		nbanks;
 
-	struct nuc980_pmx_func  *functions;
-	int         nfunctions;
+	struct nuc980_pmx_func *functions;
+	int		nfunctions;
 
 	struct nuc980_pin_group *groups;
-	int         ngroups;
+	int		ngroups;
 };
 
 static const inline struct nuc980_pin_group *nuc980_pinctrl_find_group_by_name(
-    const struct nuc980_pinctrl *info,
-    const char *name)
+			const struct nuc980_pinctrl *info,
+			const char *name)
 {
 	const struct nuc980_pin_group *grp = NULL;
 	int i;
@@ -225,7 +222,6 @@ static const inline struct nuc980_pin_group *nuc980_pinctrl_find_group_by_name(
 		dev_dbg(info->dev, "%s: %d 0:%d\n", name, grp->npins, grp->pins[0]);
 		break;
 	}
-
 	return grp;
 }
 
@@ -237,7 +233,7 @@ static int nuc980_get_groups_count(struct pinctrl_dev *pctldev)
 }
 
 static const char *nuc980_get_group_name(struct pinctrl_dev *pctldev,
-        unsigned selector)
+					 unsigned selector)
 {
 	struct nuc980_pinctrl *info = pinctrl_dev_get_drvdata(pctldev);
 
@@ -245,24 +241,22 @@ static const char *nuc980_get_group_name(struct pinctrl_dev *pctldev,
 }
 
 static int nuc980_get_group_pins(struct pinctrl_dev *pctldev, unsigned selector,
-                                 const unsigned **pins,
-                                 unsigned *npins)
+				 const unsigned **pins,
+				 unsigned *npins)
 {
 	struct nuc980_pinctrl *info = pinctrl_dev_get_drvdata(pctldev);
 
 	if (selector >= info->ngroups) {
 		return -EINVAL;
 	}
-
 	*pins = info->groups[selector].pins;
 	*npins = info->groups[selector].npins;
-
 	return 0;
 }
 
 static int nuc980_dt_node_to_map(struct pinctrl_dev *pctldev,
-                                 struct device_node *np,
-                                 struct pinctrl_map **map, unsigned *num_maps)
+				 struct device_node *np,
+				 struct pinctrl_map **map, unsigned *num_maps)
 {
 	struct nuc980_pinctrl *info = pinctrl_dev_get_drvdata(pctldev);
 	const struct nuc980_pin_group *grp;
@@ -278,12 +272,12 @@ static int nuc980_dt_node_to_map(struct pinctrl_dev *pctldev,
 	grp = nuc980_pinctrl_find_group_by_name(info, np->name);
 	if (!grp) {
 		dev_err(info->dev, "unable to find group for node %s\n",
-		        np->name);
+			np->name);
 		return -EINVAL;
 	}
 
 	map_num += grp->npins;
-	new_map = devm_kzalloc(pctldev->dev, sizeof(*new_map) * map_num, GFP_KERNEL);
+	new_map = devm_kzalloc(info->dev, sizeof(*new_map) * map_num, GFP_KERNEL);
 	if (!new_map) {
 		return -ENOMEM;
 	}
@@ -294,7 +288,7 @@ static int nuc980_dt_node_to_map(struct pinctrl_dev *pctldev,
 	/* create mux map */
 	parent = of_get_parent(np);
 	if (!parent) {
-		devm_kfree(pctldev->dev, new_map);
+		devm_kfree(info->dev, new_map);
 		return -EINVAL;
 	}
 	new_map[0].type = PIN_MAP_TYPE_MUX_GROUP;
@@ -311,14 +305,14 @@ static int nuc980_dt_node_to_map(struct pinctrl_dev *pctldev,
 		new_map[i].data.configs.num_configs = 1;
 	}
 
-	dev_dbg(pctldev->dev, "maps: function %s group %s num %d\n",
-	        (*map)->data.mux.function, (*map)->data.mux.group, map_num);
+	dev_dbg(info->dev, "maps: function %s group %s num %d\n",
+		(*map)->data.mux.function, (*map)->data.mux.group, map_num);
 
 	return 0;
 }
 
 static void nuc980_dt_free_map(struct pinctrl_dev *pctldev,
-                               struct pinctrl_map *map, unsigned num_maps)
+			       struct pinctrl_map *map, unsigned num_maps)
 {
 }
 
@@ -336,7 +330,7 @@ static void nuc980_pin_dbg(const struct device *dev, const struct nuc980_pmx_pin
 }
 
 static int pin_check_config(struct nuc980_pinctrl *info, const char *name,
-                            int index, const struct nuc980_pmx_pin *pin)
+			    int index, const struct nuc980_pmx_pin *pin)
 {
 	/* check if it's a valid config */
 	if (pin->bank >= info->nbanks) {
@@ -367,7 +361,7 @@ static int nuc980_pmx_get_funcs_count(struct pinctrl_dev *pctldev)
 }
 
 static const char *nuc980_pmx_get_func_name(struct pinctrl_dev *pctldev,
-        unsigned selector)
+					    unsigned selector)
 {
 	struct nuc980_pinctrl *info = pinctrl_dev_get_drvdata(pctldev);
 
@@ -375,8 +369,8 @@ static const char *nuc980_pmx_get_func_name(struct pinctrl_dev *pctldev,
 }
 
 static int nuc980_pmx_get_groups(struct pinctrl_dev *pctldev, unsigned selector,
-                                 const char * const **groups,
-                                 unsigned * const num_groups)
+				 const char * const **groups,
+				 unsigned * const num_groups)
 {
 	struct nuc980_pinctrl *info = pinctrl_dev_get_drvdata(pctldev);
 
@@ -393,7 +387,7 @@ static int nuc980_pmx_get_groups(struct pinctrl_dev *pctldev, unsigned selector,
  * different ports. for example UART....
  */
 int nuc980_pmx_set_mux(struct pinctrl_dev *pctldev, unsigned selector,
-                  unsigned group)
+		       unsigned group)
 {
 	struct nuc980_pinctrl *info = pinctrl_dev_get_drvdata(pctldev);
 	const struct nuc980_pmx_pin *pins_conf = info->groups[group].pins_conf;
@@ -449,6 +443,7 @@ static const struct pinconf_ops nuc980_pinconf_ops = {
 };
 
 static struct pinctrl_desc nuc980_pinctrl_desc = {
+	.name     = "nuc980-pinctrl",
 	.pins     = nuc980_pins,
 	.npins    = ARRAY_SIZE(nuc980_pins),
 	.pctlops  = &nuc980_pctrl_ops,
@@ -555,27 +550,25 @@ static int nuc980_pinctrl_parse_functions(struct device_node *np,
 	return 0;
 }
 
-static struct of_device_id nuc980_pinctrl_of_match[] = {
-	{ .compatible = "nuvoton,nuc980-pinctrl", NULL },
-	{ /* sentinel */ }
-};
-
-static int nuc980_pinctrl_probe_dt(struct platform_device *pdev,
-                                   struct nuc980_pinctrl *info)
+static int nuc980_pinctrl_probe(struct platform_device *pdev)
 {
-	int ret = 0;
-	int i;
+	struct nuc980_pinctrl *info;
 	struct device_node *np = pdev->dev.of_node;
 	struct device_node *child;
+	int ret;
+	int i;
 
-	if (!np) {
+	if (!np)
 		return -ENODEV;
+
+	info = devm_kzalloc(&pdev->dev, sizeof(*info), GFP_KERNEL);
+	if (!info) {
+		return -ENOMEM;
 	}
 
 	info->dev = &pdev->dev;
 	info->nbanks = 7;  /* PA ~ PG */
 	nuc980_pinctrl_child_count(info, np);
-
 	info->functions = devm_kzalloc(&pdev->dev, info->nfunctions * sizeof(struct nuc980_pmx_func),
 	                               GFP_KERNEL);
 	if (!info->functions) {
@@ -592,31 +585,12 @@ static int nuc980_pinctrl_probe_dt(struct platform_device *pdev,
 	dev_dbg(&pdev->dev, "ngroups = %d\n", info->ngroups);
 
 	i = 0;
-
 	for_each_child_of_node(np, child) {
 		ret = nuc980_pinctrl_parse_functions(child, info, i++);
 		if (ret) {
 			dev_err(&pdev->dev, "failed to parse function\n");
 			return ret;
 		}
-	}
-
-	return 0;
-}
-
-static int nuc980_pinctrl_probe(struct platform_device *pdev)
-{
-	struct nuc980_pinctrl *info;
-	int ret;
-
-	info = devm_kzalloc(&pdev->dev, sizeof(*info), GFP_KERNEL);
-	if (!info) {
-		return -ENOMEM;
-	}
-
-	ret = nuc980_pinctrl_probe_dt(pdev, info);
-	if (ret) {
-		return ret;
 	}
 
 	nuc980_pinctrl_desc.name = dev_name(&pdev->dev);
@@ -629,54 +603,39 @@ static int nuc980_pinctrl_probe(struct platform_device *pdev)
 //      }
 //  }
 
-	platform_set_drvdata(pdev, info);
-	info->pctl = pinctrl_register(&nuc980_pinctrl_desc, &pdev->dev, info);
-
-	if (!info->pctl) {
-		dev_err(&pdev->dev, "could not register NUC980 pinctrl driver\n");
-		ret = -EINVAL;
-		goto err;
+	dev_set_drvdata(&pdev->dev, info);
+	info->pctldev = devm_pinctrl_register(&pdev->dev,
+					       &nuc980_pinctrl_desc, info);
+	if (IS_ERR(info->pctldev)) {
+		dev_err(&pdev->dev, "Failed to register pinctrl device\n");
+		return PTR_ERR(info->pctldev);
 	}
-
 	dev_info(&pdev->dev, "initialized NUC980 pinctrl driver\n");
-
-	return 0;
-
-err:
-	return ret;
-}
-
-static int nuc980_pinctrl_remove(struct platform_device *pdev)
-{
-	struct nuc980_pinctrl *info = platform_get_drvdata(pdev);
-
-	pinctrl_unregister(info->pctl);
-
 	return 0;
 }
+
+static const struct of_device_id nuc980_pinctrl_match[] = {
+	{ .compatible = "nuvoton,nuc980-pinctrl" },
+	{ },
+};
+MODULE_DEVICE_TABLE(of, nuc980_pinctrl_match);
 
 static struct platform_driver nuc980_pinctrl_driver = {
 	.driver = {
-		.name = "pinctrl-nuc980",
-		.owner = THIS_MODULE,
-		.of_match_table = of_match_ptr(nuc980_pinctrl_of_match),
+		.name = "nuc980-pinctrl",
+		.of_match_table = nuc980_pinctrl_match,
+		.suppress_bind_attrs = true,
 	},
 	.probe = nuc980_pinctrl_probe,
-	.remove = nuc980_pinctrl_remove,
 };
 
 static int __init nuc980_pinctrl_init(void)
 {
 	return platform_driver_register(&nuc980_pinctrl_driver);
 }
+
 arch_initcall(nuc980_pinctrl_init);
 
-static void __exit nuc980_pinctrl_exit(void)
-{
-	platform_driver_unregister(&nuc980_pinctrl_driver);
-}
-
-module_exit(nuc980_pinctrl_exit);
-MODULE_AUTHOR("Nuvoton Technology Corp.");
-MODULE_DESCRIPTION("Nuvoton NUC980 SOC series pinctrl driver");
-MODULE_LICENSE("GPL");
+MODULE_LICENSE("GPL v2");
+MODULE_AUTHOR("ychuang3@nuvoton.com");
+MODULE_DESCRIPTION("Nuvoton NUC980 series pinctrl driver");

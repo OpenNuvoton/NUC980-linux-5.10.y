@@ -341,14 +341,6 @@ config PINCTRL_ZYNQ
 	help
 	  This selects the pinctrl driver for Xilinx Zynq.
 
-config PINCTRL_NUC980
-        bool "NUC980 pinctrl driver"
-        depends on ARCH_NUC980
-        select PINMUX
-        select PINCONF
-        help
-          Say Y here to enable NUC980 pinctrl driver
-
 config PINCTRL_INGENIC
 	bool "Pinctrl driver for the Ingenic JZ47xx SoCs"
 	default MACH_INGENIC

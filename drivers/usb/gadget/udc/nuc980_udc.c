@@ -37,6 +37,7 @@
 #include <linux/list.h>
 #include <linux/interrupt.h>
 #include <linux/usb/gadget.h>
+#include <linux/pinctrl/consumer.h>
 #include <linux/platform_device.h>
 #include <asm/byteorder.h>
 #include <linux/dma-mapping.h>
@@ -57,7 +58,6 @@
 #define DRIVER_AUTHOR   "shirley <clyu2@nuvoton.com>"
 
 #define USBD_TIMEOUT	(10000)
-u32 volatile usb_vaddr, usb_paddr;
 
 static const char gadget_name [] = "nuc980-usbdev";
 static const char driver_desc [] = DRIVER_DESC;
@@ -159,8 +159,9 @@ static inline int write_packet(struct nuc980_ep *ep, struct nuc980_request *req)
 	struct nuc980_udc *udc = ep->dev;
 	unsigned total, len;
 	u8  *buf;
-	u32 i;
+	u32 i, ret;
 	unsigned int volatile timeout;
+	dma_addr_t dma_addr;
 
 	buf = req->req.buf + req->req.actual;
 	prefetch(buf);
@@ -179,7 +180,7 @@ static inline int write_packet(struct nuc980_ep *ep, struct nuc980_request *req)
 		__raw_writel(len, udc->base + REG_USBD_CEPTXCNT);
 		req->req.actual += len;
 	}
-	else
+	else	/* in-transfer */
 	{
 		usb_gadget_map_request(&udc->gadget, &req->req, ep->ep_dir);
 		buf = req->req.buf + req->req.actual;
@@ -190,13 +191,19 @@ static inline int write_packet(struct nuc980_ep *ep, struct nuc980_request *req)
 		}
 		else
 		{
-			memcpy((char *)usb_vaddr, (char *)buf, len);
+			dma_addr = dma_map_single(udc->gadget.dev.parent, buf, len, ep->ep_dir ? DMA_TO_DEVICE : DMA_FROM_DEVICE);
+			ret = dma_mapping_error(udc->gadget.dev.parent, dma_addr);
+			if (ret) {
+				dev_err(udc->gadget.dev.parent, "dma mapping error\n");
+				return -EINVAL;
+			}
+
 			__raw_writel((__raw_readl(udc->base + REG_USBD_DMACTL)&0xe0) | 0x110 | ep->ep_num,
 						 udc->base + REG_USBD_DMACTL);// bulk in, write
 			__raw_writel(0, udc->base + REG_USBD_EPA_EPINTEN + (0x28* (ep->index-1)));
 			__raw_writel((USBD_BUSINTEN_DMADONEIEN | USBD_BUSINTEN_RSTIEN | USBD_BUSINTEN_SUSPENDIEN | USBD_BUSINTEN_VBUSDETIEN), udc->base + REG_USBD_BUSINTEN);
 			//__raw_writel((u32)(req->req.dma + req->req.actual), udc->base + REG_USBD_DMAADDR);
-			__raw_writel((u32)usb_paddr, udc->base + REG_USBD_DMAADDR);//Tell DMA the memory physcal address
+			__raw_writel((u32)dma_addr, udc->base + REG_USBD_DMAADDR);//Tell DMA the memory physcal address
 			__raw_writel(len, udc->base + REG_USBD_DMACNT);
 			__raw_writel(0x20, udc->base + REG_USBD_BUSINTSTS);
 
@@ -221,6 +228,7 @@ static inline int write_packet(struct nuc980_ep *ep, struct nuc980_request *req)
 				timeout++;
 			}
 			__raw_writel(0x20, udc->base + REG_USBD_BUSINTSTS);
+			dma_unmap_single(udc->gadget.dev.parent, dma_addr, len, ep->ep_dir ? DMA_TO_DEVICE : DMA_FROM_DEVICE);
 		}
 		__raw_writel((__raw_readl(udc->base + REG_USBD_EPA_EPRSPCTL+0x28*(ep->index-1)) & 0x16)|USB_EP_RSPCTL_SHORTTXEN, udc->base + REG_USBD_EPA_EPRSPCTL+0x28*(ep->index-1));
 		__raw_writel(len, udc->base + REG_USBD_EPA_EPTXCNT+0x28*(ep->index-1));
@@ -256,8 +264,10 @@ static int write_fifo(struct nuc980_ep *ep, struct nuc980_request *req)
 static inline int read_packet(struct nuc980_ep *ep,u8 *buf, struct nuc980_request *req, u16 cnt)
 {
 	struct nuc980_udc *udc = ep->dev;
-	unsigned int data, i;
+	unsigned int data, i, ret;
 	unsigned int volatile timeout;
+	dma_addr_t dma_addr;
+	unsigned int len = ep->ep.maxpacket;
 
 	if (ep->ep_num == 0)
 	{ //ctrl pipe don't use DMA
@@ -269,13 +279,20 @@ static inline int read_packet(struct nuc980_ep *ep,u8 *buf, struct nuc980_reques
 		}
 		req->req.actual += cnt;
 	}
-	else
+	else	/* out-transfer */
 	{
 		usb_gadget_map_request(&udc->gadget, &req->req, ep->ep_dir);
 
 		__raw_writel((__raw_readl(udc->base + REG_USBD_DMACTL) & 0xe0)|ep->ep_num, udc->base + REG_USBD_DMACTL);   //read
 //		__raw_writel((u32)(req->req.dma + req->req.actual), udc->base + REG_USBD_DMAADDR);
-		__raw_writel((u32)usb_paddr, udc->base + REG_USBD_DMAADDR);
+
+		dma_addr = dma_map_single(udc->gadget.dev.parent, buf, len, ep->ep_dir ? DMA_TO_DEVICE : DMA_FROM_DEVICE);
+		ret = dma_mapping_error(udc->gadget.dev.parent, dma_addr);
+		if (ret) {
+			dev_err(udc->gadget.dev.parent, "dma mapping error\n");
+			return -EINVAL;
+		}
+		__raw_writel((u32)dma_addr, udc->base + REG_USBD_DMAADDR);//Tell DMA the memory physcal address
 		__raw_writel(cnt, udc->base + REG_USBD_DMACNT);
 		__raw_writel(0x20, udc->base + REG_USBD_BUSINTSTS);
 		__raw_writel(__raw_readl(udc->base + REG_USBD_DMACTL)|0x00000020, udc->base + REG_USBD_DMACTL);
@@ -299,7 +316,7 @@ static inline int read_packet(struct nuc980_ep *ep,u8 *buf, struct nuc980_reques
 			timeout++;
 		}
 		__raw_writel(0x20, udc->base + REG_USBD_BUSINTSTS);
-		memcpy((char *)buf, (char *)usb_vaddr, cnt);
+		dma_unmap_single(udc->gadget.dev.parent, dma_addr, len, ep->ep_dir ? DMA_TO_DEVICE : DMA_FROM_DEVICE);
 		req->req.actual += cnt;
 	}
 
@@ -1090,7 +1107,7 @@ static const struct usb_ep_ops nuc980_ep_ops =
 	.queue          = nuc980_queue,
 	.dequeue        = nuc980_dequeue,
 
-	.set_halt       = nuc980_set_halt,
+	.set_halt	= nuc980_set_halt,
 	.fifo_status	= nuc980_fifo_status,
 	.fifo_flush		= nuc980_fifo_flush,
 };
@@ -1140,7 +1157,7 @@ static int nuc980_pullup (struct usb_gadget *g, int is_on)
 }
 
 static int nuc980_udc_start(struct usb_gadget *g, struct usb_gadget_driver *driver);
-static int nuc980_udc_stop(struct usb_gadget *g, struct usb_gadget_driver *driver);
+static int nuc980_udc_stop(struct usb_gadget *g);
 
 static const struct usb_gadget_ops nuc980_ops =
 {
@@ -1205,7 +1222,7 @@ static int nuc980_udc_start(struct usb_gadget *g, struct usb_gadget_driver *driv
 /*
  *  nuc980_udc_stop
  */
-static int nuc980_udc_stop(struct usb_gadget *g, struct usb_gadget_driver *driver)
+static int nuc980_udc_stop(struct usb_gadget *g)
 {
 	struct nuc980_udc *udc = to_nuc980_udc(g);
 	unsigned int volatile i;
@@ -1521,15 +1538,15 @@ static int nuc980_udc_probe(struct platform_device *pdev)
             return PTR_ERR(p);
         }
 
-		/*
-		 * Right now device-tree probed devices don't get dma_mask set.
-		 * Since shared usb code relies on it, set it here for now.
-		 * Once we have dma capability bindings this can go away.
-		 */
-		if (!pdev->dev.dma_mask)
-			pdev->dev.dma_mask = &pdev->dev.coherent_dma_mask;
-		if (!pdev->dev.coherent_dma_mask)
-			pdev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
+	/*
+	 * Right now device-tree probed devices don't get dma_mask set.
+	 * Since shared usb code relies on it, set it here for now.
+	 * Once we have dma capability bindings this can go away.
+	 */
+	if (!pdev->dev.dma_mask)
+		pdev->dev.dma_mask = &pdev->dev.coherent_dma_mask;
+	if (!pdev->dev.coherent_dma_mask)
+		pdev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
 
 #else
 	p = devm_pinctrl_get_select(&pdev->dev, "usbd-vbusvld");
@@ -1613,12 +1630,13 @@ static int nuc980_udc_probe(struct platform_device *pdev)
 		goto fail2;
 	}
 
-	usb_vaddr = (u32)dma_alloc_writecombine(NULL, 512, (u32 *)&usb_paddr, GFP_KERNEL);
 	error = usb_add_gadget_udc(dev, &udc->gadget);
 	if (error)
 		goto fail3;
 
 	pr_devel("nuc980_udc_probe done.\n");
+	pr_info("nuc980 usb device probe ok\n");
+
 	return 0;
 fail3:
 	free_irq(udc->irq, udc);

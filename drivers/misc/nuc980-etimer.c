@@ -58,7 +58,7 @@
 #define ETIMER_IER_TCAP_IE		0x00000002
 
 
-#define ETIMER_TRIGGER_COUNTING 	(ETIMER_CTL_TRIGGER_COUNTING |\
+#define ETIMER_TRIGGER_COUNTING		(ETIMER_CTL_TRIGGER_COUNTING |\
                                      ETIMER_CTL_TCAP_EN |\
                                      ETIMER_CTL_PERIODIC |\
                                      ETIMER_CTL_ETMR_EN)
@@ -74,9 +74,10 @@
 
 struct nuc980_etimer {
 	spinlock_t lock;
-	struct pinctrl *pinctrl;
+	struct device *dev;
 	struct clk *clk;
 	struct clk *eclk;
+	void __iomem *regs;
 	wait_queue_head_t wq;
 	int minor;	// dynamic minor num, so we need this to distinguish between channels
 	u32 cap;	// latest capture data
@@ -88,9 +89,8 @@ struct nuc980_etimer {
 	u8 update;	// new capture data available
 };
 
-
 static struct nuc980_etimer *etmr[ETIMER_CH];
-#ifdef CONFIG_NUC980_TIMER_WKUP
+#ifdef CONFIG_PM
 static uint8_t gu8_ch;
 #endif
 static uint32_t gu32_cnt;
@@ -491,10 +491,6 @@ static long etimer_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 	int unsigned param;
 	u32 clksrc;
 	void __iomem *TMRBaseAddr = TIMER0;
-#ifndef CONFIG_USE_OF
-	struct pinctrl_state *s;
-	int ret;
-#endif
 
 	// stop timer before we do any change
 	stop_timer(t);
@@ -558,7 +554,7 @@ static long etimer_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 
 		break;
 
-#ifdef CONFIG_NUC980_TIMER_WKUP
+#ifdef CONFIG_PM
 	case TMR_IOC_PERIODIC_FOR_WKUP:
 
 		if(copy_from_user((void *)&param, (const void *)arg, sizeof(unsigned int)))
@@ -583,7 +579,6 @@ static long etimer_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		__raw_writel(0x1, REG_TIMER_IER(TMRBaseAddr));
 		__raw_writel(ETIMER_CTL_PERIODIC  | ETIMER_CTL_ETMR_EN, REG_TIMER_CTL(TMRBaseAddr));
 
-
 		t->mode = ETIMER_OPMODE_PERIODIC;
 		spin_unlock_irqrestore(&t->lock, flag);
 
@@ -600,61 +595,6 @@ static long etimer_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		if(param > 0xFFFFFF)
 			return -EPERM;
 
-#ifndef CONFIG_USE_OF
-		// set pin function
-		if(t->ch == 0) {
-#if defined (CONFIG_NUC980_TIMER0_TGL_PB3)
-			s = pinctrl_lookup_state(t->pinctrl, "etimer0-tgl-PB3");
-#elif defined (CONFIG_NUC980_TIMER0_TGL_PC0)
-			s = pinctrl_lookup_state(t->pinctrl, "etimer0-tgl-PC0");
-#elif defined (CONFIG_NUC980_TIMER0_TGL_PB9)
-			s = pinctrl_lookup_state(t->pinctrl, "etimer0-tgl-PB9");
-#elif defined (CONFIG_NUC980_TIMER0_TGL_NONE)
-			return -EPERM;
-#endif
-		} else if(t->ch == 1) {
-#if defined (CONFIG_NUC980_TIMER1_TGL_PA14)
-			s = pinctrl_lookup_state(t->pinctrl, "etimer1-tgl-PA14");
-#elif defined (CONFIG_NUC980_TIMER1_TGL_PD0)
-			s = pinctrl_lookup_state(t->pinctrl, "etimer1-tgl-PD0");
-#elif defined (CONFIG_NUC980_TIMER1_TGL_PG11)
-			s = pinctrl_lookup_state(t->pinctrl, "etimer1-tgl-PG11");
-#elif defined (CONFIG_NUC980_TIMER1_TGL_PF8)
-			s = pinctrl_lookup_state(t->pinctrl, "etimer1-tgl-PF8");
-#elif defined (CONFIG_NUC980_TIMER1_TGL_NONE)
-			return -EPERM;
-#endif
-		} else if(t->ch == 2) {
-#if defined (CONFIG_NUC980_TIMER2_TGL_PA10)
-			s = pinctrl_lookup_state(t->pinctrl, "etimer2-tgl-PA10");
-#elif defined (CONFIG_NUC980_TIMER2_TGL_PB12)
-			s = pinctrl_lookup_state(t->pinctrl, "etimer2-tgl-PB12");
-#elif defined (CONFIG_NUC980_TIMER2_TGL_PD12)
-			s = pinctrl_lookup_state(t->pinctrl, "etimer2-tgl-PD12");
-#elif defined (CONFIG_NUC980_TIMER2_TGL_NONE)
-			return -EPERM;
-#endif
-		} else if(t->ch == 3) {
-#if defined (CONFIG_NUC980_TIMER3_TGL_PA8)
-			s = pinctrl_lookup_state(t->pinctrl, "etimer3-tgl-PA8");
-#elif defined (CONFIG_NUC980_TIMER3_TGL_PD14)
-			s = pinctrl_lookup_state(t->pinctrl, "etimer3-tgl-PD14");
-#elif defined (CONFIG_NUC980_TIMER3_TGL_NONE)
-			return -EPERM;
-#endif
-		}
-
-		if (IS_ERR(s)) {
-			pr_debug("pinctrl_lookup_state err\n");
-			return -EPERM;
-		}
-
-		if((ret = pinctrl_select_state(t->pinctrl, s)) < 0) {
-			pr_debug("pinctrl_select_state err\n");
-			return ret;
-		}
-#endif
-
 		spin_lock_irqsave(&t->lock, flag);
 		// timer clock is 12MHz, set prescaler to 12 - 1.
 		__raw_writel(11, REG_TIMER_PRECNT(TMRBaseAddr));
@@ -663,7 +603,6 @@ static long etimer_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		t->mode = ETIMER_OPMODE_TOGGLE;
 		pr_debug("Toggle REG_TIMER_CTL(%d)=0x%08x\n",ch, __raw_readl(REG_TIMER_CTL(TMRBaseAddr)));
 		spin_unlock_irqrestore(&t->lock, flag);
-
 		break;
 
 	case TMR_IOC_EVENT_COUNTING:
@@ -671,60 +610,6 @@ static long etimer_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		// get capture setting
 		if(copy_from_user((void *)&param, (const void *)arg, sizeof(unsigned int)))
 			return -EFAULT;
-
-#ifndef CONFIG_USE_OF
-		// set pin function
-		if(t->ch == 0) {
-#if defined (CONFIG_NUC980_TIMER0_ECNT_PA0)
-			s = pinctrl_lookup_state(t->pinctrl, "etimer0-ecnt-PA0");
-#elif defined (CONFIG_NUC980_TIMER0_ECNT_PD6)
-			s = pinctrl_lookup_state(t->pinctrl, "etimer0-ecnt-PD6");
-#elif defined (CONFIG_NUC980_TIMER0_ECNT_PF0)
-			s = pinctrl_lookup_state(t->pinctrl, "etimer0-ecnt-PF0");
-#elif defined (CONFIG_NUC980_TIMER0_ECNT_NONE)
-			return -EPERM;
-#endif
-		} else if(t->ch == 1) {
-#if defined (CONFIG_NUC980_TIMER1_ECNT_PA1)
-			s = pinctrl_lookup_state(t->pinctrl, "etimer1-ecnt-PA1");
-#elif defined (CONFIG_NUC980_TIMER1_ECNT_PD7)
-			s = pinctrl_lookup_state(t->pinctrl, "etimer1-ecnt-PD7");
-#elif defined (CONFIG_NUC980_TIMER1_ECNT_PF1)
-			s = pinctrl_lookup_state(t->pinctrl, "etimer1-ecnt-PF1");
-#elif defined (CONFIG_NUC980_TIMER1_ECNT_NONE)
-			return -EPERM;
-#endif
-		} else if(t->ch == 2) {
-#if defined (CONFIG_NUC980_TIMER2_ECNT_PA2)
-			s = pinctrl_lookup_state(t->pinctrl, "etimer2-ecnt-PA2");
-#elif defined (CONFIG_NUC980_TIMER2_ECNT_PD8)
-			s = pinctrl_lookup_state(t->pinctrl, "etimer2-ecnt-PD8");
-#elif defined (CONFIG_NUC980_TIMER2_ECNT_PF2)
-			s = pinctrl_lookup_state(t->pinctrl, "etimer2-ecnt-PF2");
-#elif defined (CONFIG_NUC980_TIMER2_ECNT_NONE)
-			return -EPERM;
-#endif
-		} else if(t->ch == 3) {
-#if defined (CONFIG_NUC980_TIMER3_ECNT_PA3)
-			s = pinctrl_lookup_state(t->pinctrl, "etimer3-ecnt-PA3");
-#elif defined (CONFIG_NUC980_TIMER3_ECNT_PD9)
-			s = pinctrl_lookup_state(t->pinctrl, "etimer3-ecnt-PD9");
-#elif defined (CONFIG_NUC980_TIMER3_ECNT_PF3)
-			s = pinctrl_lookup_state(t->pinctrl, "etimer3-ecnt-PF3");
-#elif defined (CONFIG_NUC980_TIMER3_ECNT_NONE)
-			return -EPERM;
-#endif
-		}
-
-		if (IS_ERR(s)) {
-			pr_debug("pinctrl_lookup_state err\n");
-			return -EPERM;
-		}
-		if((ret = pinctrl_select_state(t->pinctrl, s)) < 0) {
-			pr_debug("pinctrl_select_state err\n");
-			return ret;
-		}
-#endif
 
 		spin_lock_irqsave(&t->lock, flag);
 		// timer clock is 12MHz, set prescaler to 12 - 1.
@@ -735,7 +620,6 @@ static long etimer_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		__raw_writel(ETIMER_EVENT_COUNTER | ETIMER_CTL_PERIODIC | TMR_EXTCNT_EDGE_FF, REG_TIMER_CTL(TMRBaseAddr));
 		t->mode = ETIMER_OPMODE_EVENT_COUNTING;
 		spin_unlock_irqrestore(&t->lock, flag);
-
 		break;
 
 	case TMR_IOC_FREE_COUNTING:
@@ -743,60 +627,6 @@ static long etimer_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		// get capture setting
 		if(copy_from_user((void *)&param, (const void *)arg, sizeof(unsigned int)))
 			return -EFAULT;
-
-#ifndef CONFIG_USE_OF
-		// set pin function
-		if(t->ch == 0) {
-#if defined (CONFIG_NUC980_TIMER0_CAP_PB1)
-			s = pinctrl_lookup_state(t->pinctrl, "etimer0-cap-PB1");
-#elif defined (CONFIG_NUC980_TIMER0_CAP_PB8)
-			s = pinctrl_lookup_state(t->pinctrl, "etimer0-cap-PB8");
-#elif defined (CONFIG_NUC980_TIMER0_CAP_PB10)
-			s = pinctrl_lookup_state(t->pinctrl, "etimer0-cap-PB10");
-#elif defined (CONFIG_NUC980_TIMER0_CAP_NONE)
-			return -EPERM;
-#endif
-		} else if(t->ch == 1) {
-#if defined (CONFIG_NUC980_TIMER1_CAP_PA13)
-			s = pinctrl_lookup_state(t->pinctrl, "etimer1-cap-PA13");
-#elif defined (CONFIG_NUC980_TIMER1_CAP_PD1)
-			s = pinctrl_lookup_state(t->pinctrl, "etimer1-cap-PD1");
-#elif defined (CONFIG_NUC980_TIMER1_CAP_PG12)
-			s = pinctrl_lookup_state(t->pinctrl, "etimer1-cap-PG12");
-#elif defined (CONFIG_NUC980_TIMER1_CAP_PF9)
-			s = pinctrl_lookup_state(t->pinctrl, "etimer1-cap-PF9");
-#elif defined (CONFIG_NUC980_TIMER1_CAP_NONE)
-			return -EPERM;
-#endif
-		} else if(t->ch == 2) {
-#if defined (CONFIG_NUC980_TIMER2_CAP_PA9)
-			s = pinctrl_lookup_state(t->pinctrl, "etimer2-cap-PA9");
-#elif defined (CONFIG_NUC980_TIMER2_CAP_PB11)
-			s = pinctrl_lookup_state(t->pinctrl, "etimer2-cap-PB11");
-#elif defined (CONFIG_NUC980_TIMER2_CAP_PD13)
-			s = pinctrl_lookup_state(t->pinctrl, "etimer2-cap-PD13");
-#elif defined (CONFIG_NUC980_TIMER2_CAP_NONE)
-			return -EPERM;
-#endif
-		} else if(t->ch == 3) {
-#if defined (CONFIG_NUC980_TIMER3_CAP_PA7)
-			s = pinctrl_lookup_state(t->pinctrl, "etimer3-cap-PA7");
-#elif defined (CONFIG_NUC980_TIMER3_CAP_PD15)
-			s = pinctrl_lookup_state(t->pinctrl, "etimer3-cap-PD15");
-#elif defined (CONFIG_NUC980_TIMER3_CAP_NONE)
-			return -EPERM;
-#endif
-		}
-
-		if (IS_ERR(s)) {
-			pr_debug("pinctrl_lookup_state err\n");
-			return -EPERM;
-		}
-		if((ret = pinctrl_select_state(t->pinctrl, s)) < 0) {
-			pr_debug("pinctrl_select_state err\n");
-			return ret;
-		}
-#endif
 
 		spin_lock_irqsave(&t->lock, flag);
 		// timer clock is 12MHz.
@@ -815,61 +645,6 @@ static long etimer_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		// get capture setting
 		if(copy_from_user((void *)&param, (const void *)arg, sizeof(unsigned int)))
 			return -EFAULT;
-
-
-#ifndef CONFIG_USE_OF
-		// set pin function
-		if(t->ch == 0) {
-#if defined (CONFIG_NUC980_TIMER0_CAP_PB1)
-			s = pinctrl_lookup_state(t->pinctrl, "etimer0-cap-PB1");
-#elif defined (CONFIG_NUC980_TIMER0_CAP_PB8)
-			s = pinctrl_lookup_state(t->pinctrl, "etimer0-cap-PB8");
-#elif defined (CONFIG_NUC980_TIMER0_CAP_PB10)
-			s = pinctrl_lookup_state(t->pinctrl, "etimer0-cap-PB10");
-#elif defined (CONFIG_NUC980_TIMER0_CAP_NONE)
-			return -EPERM;
-#endif
-		} else if(t->ch == 1) {
-#if defined (CONFIG_NUC980_TIMER1_CAP_PA13)
-			s = pinctrl_lookup_state(t->pinctrl, "etimer1-cap-PA13");
-#elif defined (CONFIG_NUC980_TIMER1_CAP_PD1)
-			s = pinctrl_lookup_state(t->pinctrl, "etimer1-cap-PD1");
-#elif defined (CONFIG_NUC980_TIMER1_CAP_PG12)
-			s = pinctrl_lookup_state(t->pinctrl, "etimer1-cap-PG12");
-#elif defined (CONFIG_NUC980_TIMER1_CAP_PF9)
-			s = pinctrl_lookup_state(t->pinctrl, "etimer1-cap-PF9");
-#elif defined (CONFIG_NUC980_TIMER1_CAP_NONE)
-			return -EPERM;
-#endif
-		} else if(t->ch == 2) {
-#if defined (CONFIG_NUC980_TIMER2_CAP_PA9)
-			s = pinctrl_lookup_state(t->pinctrl, "etimer2-cap-PA9");
-#elif defined (CONFIG_NUC980_TIMER2_CAP_PB11)
-			s = pinctrl_lookup_state(t->pinctrl, "etimer2-cap-PB11");
-#elif defined (CONFIG_NUC980_TIMER2_CAP_PD13)
-			s = pinctrl_lookup_state(t->pinctrl, "etimer2-cap-PD13");
-#elif defined (CONFIG_NUC980_TIMER2_CAP_NONE)
-			return -EPERM;
-#endif
-		} else if(t->ch == 3) {
-#if defined (CONFIG_NUC980_TIMER3_CAP_PA7)
-			s = pinctrl_lookup_state(t->pinctrl, "etimer3-cap-PA7");
-#elif defined (CONFIG_NUC980_TIMER3_CAP_PD15)
-			s = pinctrl_lookup_state(t->pinctrl, "etimer3-cap-PD15");
-#elif defined (CONFIG_NUC980_TIMER3_CAP_NONE)
-			return -EPERM;
-#endif
-		}
-
-		if (IS_ERR(s)) {
-			pr_debug("pinctrl_lookup_state err\n");
-			return -EPERM;
-		}
-		if((ret = pinctrl_select_state(t->pinctrl, s)) < 0) {
-			pr_debug("pinctrl_select_state err\n");
-			return ret;
-		}
-#endif
 
 		spin_lock_irqsave(&t->lock, flag);
 		// timer clock is 12MHz.
@@ -936,59 +711,72 @@ static struct miscdevice etimer_dev[] = {
 
 static int nuc980_etimer_probe(struct platform_device *pdev)
 {
-	int ch = pdev->id;
-
-	//printk("nuc980_etimer_probe    %s - pdev = %s  \n", __func__, pdev->name);
-
-#ifdef CONFIG_USE_OF
-	struct pinctrl *pinctrl;
+	int ch = 0;
+	struct resource *r;
 	u32   val32[2];
 
-	//printk("nuc980_etimer_probe    %s - pdev = %s  \n", __func__, pdev->name);
-
-	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
-	if (IS_ERR(pinctrl)) {
-		return PTR_ERR(pinctrl);
-	}
-
-	if (of_property_read_u32_array(pdev->dev.of_node, "port-number", val32, 1) != 0) {
-		printk("%s can not get port-number!\n", __func__);
+	dev_info(&pdev->dev, "NUC980 Timer\n");
+	if (of_property_read_u32_array(pdev->dev.of_node, "port-number", val32,
+	                               1) != 0) {
+		pr_err("%s can not get port-number!\n", __func__);
 		return -EINVAL;
 	}
 
 	ch = val32[0];
-
-#endif
-
-	//printk("etimer %d  \n\n", ch);
-
 	etmr[ch] = devm_kzalloc(&pdev->dev, sizeof(struct nuc980_etimer), GFP_KERNEL);
 	if (etmr[ch] == NULL) {
-		dev_err(&pdev->dev, "failed to allocate memory for etimer device\n");
+		dev_err(&pdev->dev, "failed to allocate memory for timer device\n");
 		return -ENOMEM;
 	}
 
+	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	etmr[ch]->regs = devm_ioremap_resource(&pdev->dev, r);
+	if (IS_ERR(etmr[ch]->regs))
+		return PTR_ERR(etmr[ch]->regs);
 
+	etmr[ch]->dev = &pdev->dev;
 	misc_register(&etimer_dev[ch]);
 
-	etmr[ch]->pinctrl = devm_pinctrl_get(&pdev->dev);
+	if(ch == 0) {
+		etmr[ch]->clk = devm_clk_get(&pdev->dev, "timer0");
+		etmr[ch]->eclk = devm_clk_get(&pdev->dev, "timer0_eclk");
+	} else if(ch == 1) {
+		etmr[ch]->clk = devm_clk_get(&pdev->dev, "timer1");
+		etmr[ch]->eclk = devm_clk_get(&pdev->dev, "timer1_eclk");
+	} else if(ch == 2) {
+		etmr[ch]->clk = devm_clk_get(&pdev->dev, "timer2");
+		etmr[ch]->eclk = devm_clk_get(&pdev->dev, "timer2_eclk");
+	} else if(ch == 3) {
+		etmr[ch]->clk = devm_clk_get(&pdev->dev, "timer3");
+		etmr[ch]->eclk = devm_clk_get(&pdev->dev, "timer3_eclk");
+	}
+
+	if (IS_ERR(etmr[ch]->clk)) {
+		dev_err(&pdev->dev, "failed to get etmr clock\n");
+		return -ENOENT;
+	}
+
+	if (IS_ERR(etmr[ch]->eclk)) {
+		dev_err(&pdev->dev, "failed to get etmr eclock\n");
+		return -ENOENT;
+	}
+
+	clk_prepare(etmr[ch]->clk);
+	clk_enable(etmr[ch]->clk);
+	clk_prepare(etmr[ch]->eclk);
+	clk_enable(etmr[ch]->eclk);
+
 	etmr[ch]->minor = MINOR(etimer_dev[ch].minor);
 	etmr[ch]->ch = ch;
 	spin_lock_init(&etmr[ch]->lock);
 
-#ifdef CONFIG_USE_OF
 	etmr[ch]->irq = platform_get_irq(pdev, 0);
-#else
-	etmr[ch]->irq = platform_get_irq(pdev, ch);
-#endif
 
-	//printk("etimer%d(pdev->id=%d), platform_get_irq - %d\n", ch, pdev->id, etmr[ch]->irq);
+	pr_debug("   === etimer%d(pdev->id=%d), platform_get_irq %d\n", ch, pdev->id, etmr[ch]->irq);
 
 	init_waitqueue_head(&etmr[ch]->wq);
 
-
 	platform_set_drvdata(pdev, etmr[ch]);
-
 
 	return(0);
 }
@@ -1005,7 +793,7 @@ static int nuc980_etimer_remove(struct platform_device *pdev)
 }
 
 
-#ifdef CONFIG_NUC980_TIMER_WKUP
+#ifdef CONFIG_PM
 static int nuc980_etimer_suspend(struct platform_device *pdev, pm_message_t state)
 {
 	struct nuc980_etimer *t = platform_get_drvdata(pdev);
@@ -1094,10 +882,7 @@ static struct platform_driver nuc980_etimer_driver = {
 	.suspend	= nuc980_etimer_suspend,
 	.resume		= nuc980_etimer_resume,
 };
-
-
 module_platform_driver(nuc980_etimer_driver);
-
 
 
 MODULE_AUTHOR("Nuvoton Technology Corp.");

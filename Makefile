@@ -1357,6 +1357,7 @@ ifneq ($(dtstree),)
 PHONY += dtbs dtbs_install dtbs_check
 dtbs: include/config/kernel.release scripts_dtc
 	$(Q)$(MAKE) $(build)=$(dtstree)
+	cp arch/arm/boot/dts/*.dtb ../image
 
 ifneq ($(filter dtbs_check, $(MAKECMDGOALS)),)
 export CHECK_DTBS=y

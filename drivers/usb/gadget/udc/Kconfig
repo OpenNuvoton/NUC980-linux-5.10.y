@@ -220,7 +220,7 @@ config USB_PXA27X
 
 config USB_NUC980
 	tristate "NUC980 USB Device Controller"
-	depends on MACH_NUC980
+	depends on ARCH_NUC980
 	help
 	  On-chip USB Device Controller of Nuvoton NUC980.
 

@@ -67,6 +67,38 @@ extern struct nuc980_dma_platform_data nuc980_dma_data;
 #define DMA_MAX_CHAN_DESCRIPTORS    32
 #define DMA_MAX_CHAN_BYTES      0x10000
 
+#define DMA_CHANNEL(_name, _base, _irq) \
+        { .name = (_name), .base = (_base), .irq = (_irq) }
+
+struct nuc980_dma_chan_data nuc980_dma_channels[] = {
+        DMA_CHANNEL("ch0",  NUC980_VA_PDMA0 + 0x000, IRQ_PDMA0),
+        DMA_CHANNEL("ch1",  NUC980_VA_PDMA1 + 0x000, IRQ_PDMA1),
+        DMA_CHANNEL("ch2",  NUC980_VA_PDMA0 + 0x010, IRQ_PDMA0),
+        DMA_CHANNEL("ch3",  NUC980_VA_PDMA1 + 0x010, IRQ_PDMA1),
+        DMA_CHANNEL("ch4",  NUC980_VA_PDMA0 + 0x020, IRQ_PDMA0),
+        DMA_CHANNEL("ch5",  NUC980_VA_PDMA1 + 0x020, IRQ_PDMA1),
+        DMA_CHANNEL("ch6",  NUC980_VA_PDMA0 + 0x030, IRQ_PDMA0),
+        DMA_CHANNEL("ch7",  NUC980_VA_PDMA1 + 0x030, IRQ_PDMA1),
+        DMA_CHANNEL("ch8",  NUC980_VA_PDMA0 + 0x040, IRQ_PDMA0),
+        DMA_CHANNEL("ch9",  NUC980_VA_PDMA1 + 0x040, IRQ_PDMA1),
+        DMA_CHANNEL("ch10", NUC980_VA_PDMA0 + 0x050, IRQ_PDMA0),
+        DMA_CHANNEL("ch11", NUC980_VA_PDMA1 + 0x050, IRQ_PDMA1),
+        DMA_CHANNEL("ch12", NUC980_VA_PDMA0 + 0x060, IRQ_PDMA0),
+        DMA_CHANNEL("ch13", NUC980_VA_PDMA1 + 0x060, IRQ_PDMA1),
+        DMA_CHANNEL("ch14", NUC980_VA_PDMA0 + 0x070, IRQ_PDMA0),
+        DMA_CHANNEL("ch15", NUC980_VA_PDMA1 + 0x070, IRQ_PDMA1),
+        DMA_CHANNEL("ch16", NUC980_VA_PDMA0 + 0x080, IRQ_PDMA0),
+        DMA_CHANNEL("ch17", NUC980_VA_PDMA1 + 0x080, IRQ_PDMA1),
+        DMA_CHANNEL("ch18", NUC980_VA_PDMA0 + 0x090, IRQ_PDMA0),
+        DMA_CHANNEL("ch19", NUC980_VA_PDMA1 + 0x090, IRQ_PDMA1),
+};
+struct nuc980_dma_platform_data nuc980_dma_data = {
+        .channels               = nuc980_dma_channels,
+        .num_channels           = ARRAY_SIZE(nuc980_dma_channels),
+};
+
+
+
 struct nuc980_dma_engine;
 
 /**
@@ -1481,7 +1513,6 @@ static void nuc980_dma_issue_pending(struct dma_chan *chan)
 	LEAVE();
 }
 
-
 static int nuc980_dma_probe(struct platform_device *pdev)
 {
 	struct nuc980_dma_platform_data *pdata;
@@ -1613,8 +1644,8 @@ static int nuc980_dma_probe(struct platform_device *pdev)
 
 static int nuc980_dma_suspend(struct platform_device *pdev,pm_message_t state)
 {
-	struct nuc980_dma_engine *edma = platform_get_drvdata(pdev);
-	struct nuc980_dma_chan *edmac = &edma->channels[0];
+	//struct nuc980_dma_engine *edma = platform_get_drvdata(pdev);
+	//struct nuc980_dma_chan *edmac = &edma->channels[0];
 	ENTRY();
 	LEAVE();
 	return 0;
@@ -1622,8 +1653,8 @@ static int nuc980_dma_suspend(struct platform_device *pdev,pm_message_t state)
 
 static int nuc980_dma_resume(struct platform_device *pdev)
 {
-	struct nuc980_dma_engine *edma = platform_get_drvdata(pdev);
-	struct nuc980_dma_chan *edmac = &edma->channels[0];
+	//struct nuc980_dma_engine *edma = platform_get_drvdata(pdev);
+	//struct nuc980_dma_chan *edmac = &edma->channels[0];
 	ENTRY();
 	LEAVE();
 	return 0;

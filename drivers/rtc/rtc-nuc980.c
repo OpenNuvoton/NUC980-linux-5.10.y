@@ -24,6 +24,8 @@
 #include <mach/map.h>
 #include <mach/regs-gcr.h>
 
+#define RTC_GET_SPARE_DATA	_IOR('p', 0x20, unsigned long) /* Get spare register data */
+#define RTC_SET_SPARE_DATA	_IOW('p', 0x21, unsigned long) /* Set spare register data */
 
 /* RTC Control Registers */
 #define REG_RTC_INIR		0x00
@@ -92,6 +94,8 @@ static irqreturn_t nuc980_rtc_interrupt(int irq, void *_rtc)
 	unsigned long events = 0, rtc_irq;
 
 	rtc_irq = __raw_readl(rtc->rtc_reg + REG_RTC_RIIR);
+
+	//printk("\n rtc_irq = 0x%x, 0x%x \n", rtc_irq, __raw_readl(rtc->rtc_reg + REG_RTC_TLR));
 
 	if (rtc_irq & ALARMINTENB) {
 		rtc_reg_write(rtc, REG_RTC_RIIR, ALARMINTENB);
@@ -326,6 +330,7 @@ static int nuc980_rtc_probe(struct platform_device *pdev)
 {
 	struct resource *res;
 	struct nuc980_rtc *nuc980_rtc;
+	int wakeup_en = 0;
 
 	rtc_clk = clk_get(NULL, "rtc");
 	clk_prepare(rtc_clk);
@@ -363,10 +368,29 @@ static int nuc980_rtc_probe(struct platform_device *pdev)
 
 	rtc_reg_write(nuc980_rtc, REG_RTC_RIER, (__raw_readl(nuc980_rtc->rtc_reg + REG_RTC_RIER) | TICKINTENB));
 
-	#ifdef CONFIG_ENABLE_RTC_WAKEUP
-	__raw_writel((1<<7) | __raw_readl(REG_WKUPSER1),REG_WKUPSER1);
-	enable_irq_wake(nuc980_rtc->irq_num);
-	#endif
+	//of_property_read_u32(pdev->dev.of_node, "wakeup-enable", &wakeup_en);
+
+	if(of_property_read_bool(pdev->dev.of_node, "wakeup-enable")) {
+		printk("\n RTC wakeup enable \n");
+
+		__raw_writel((1<<7) | __raw_readl(REG_WKUPSER1),REG_WKUPSER1);
+		enable_irq_wake(nuc980_rtc->irq_num);
+	}
+
+	rtc_reg_write(nuc980_rtc, REG_RTC_INIR, INIRRESET);
+
+	mdelay(100);
+
+	printk("\n RTC: 0x%x ", __raw_readl(nuc980_rtc->rtc_reg + REG_RTC_TLR));
+	msleep(1000);
+	printk("\n RTC: 0x%x ", __raw_readl(nuc980_rtc->rtc_reg + REG_RTC_TLR));
+	msleep(1000);
+	printk("\n RTC: 0x%x ", __raw_readl(nuc980_rtc->rtc_reg + REG_RTC_TLR));
+	msleep(1000);
+	printk("\n RTC: 0x%x ", __raw_readl(nuc980_rtc->rtc_reg + REG_RTC_TLR));
+	msleep(1000);
+	printk("\n RTC: 0x%x ", __raw_readl(nuc980_rtc->rtc_reg + REG_RTC_TLR));
+	msleep(1000);
 
 	return 0;
 }
@@ -396,15 +420,11 @@ static int nuc980_rtc_resume(struct platform_device *pdev)
 	return 0;
 }
 
-#ifdef CONFIG_USE_OF
 static const struct of_device_id nuc980_rtc_of_match[] = {
 	{ .compatible = "nuvoton,nuc980-rtc"},
 	{},
 };
 MODULE_DEVICE_TABLE(of, nuc980_rtc_of_match);
-#else
-#define nuc980_rtc_of_match NULL
-#endif
 
 static struct platform_driver nuc980_rtc_driver = {
 	.remove     = __exit_p(nuc980_rtc_remove),

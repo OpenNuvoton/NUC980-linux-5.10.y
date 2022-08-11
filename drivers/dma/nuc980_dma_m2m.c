@@ -127,21 +127,33 @@ static int M2M_Thread_Retrigger(void *data)
 {
 	if(m2m_first) {
 		int i;
+		int ret;
 		struct dma_proxy_channel *pchannel_p=&channels;
+
 		pchannel_p->src_mem_p.size=1*1024; //set to 1Kbytes
-		pchannel_p->src_mem_p.vir_addr = (unsigned int)dma_alloc_writecombine(NULL,
-		                                 PAGE_ALIGN(pchannel_p->src_mem_p.size),
-		                                 &pchannel_p->src_mem_p.phy_addr,
-		                                 GFP_KERNEL);
+		pchannel_p->src_mem_p.vir_addr = (unsigned int)kmalloc(pchannel_p->src_mem_p.size, GFP_KERNEL);
+		pchannel_p->src_mem_p.phy_addr = dma_map_single(pchannel_p->channel_p->device->dev,
+				(void *)pchannel_p->src_mem_p.vir_addr,
+				pchannel_p->src_mem_p.size,
+				DMA_FROM_DEVICE);
+		ret = dma_mapping_error(pchannel_p->channel_p->device->dev, 
+				pchannel_p->src_mem_p.phy_addr);
+                if (ret)
+			dev_err(pchannel_p->channel_p->device->dev, "src mapping error.\n");
 
 		for(i=0; i<pchannel_p->src_mem_p.size; i++)
 			*((unsigned char *)pchannel_p->src_mem_p.vir_addr+i)=i;
 
 		pchannel_p->dest_mem_p.size=pchannel_p->src_mem_p.size;
-		pchannel_p->dest_mem_p.vir_addr = (unsigned int)dma_alloc_writecombine(NULL,
-		                                  PAGE_ALIGN(pchannel_p->dest_mem_p.size),
-		                                  &pchannel_p->dest_mem_p.phy_addr,
-		                                  GFP_KERNEL);
+		pchannel_p->dest_mem_p.vir_addr = (unsigned int)kmalloc((PAGE_ALIGN(pchannel_p->dest_mem_p.size)), GFP_KERNEL);
+		pchannel_p->dest_mem_p.phy_addr = dma_map_single(pchannel_p->channel_p->device->dev,
+				(void *)pchannel_p->dest_mem_p.vir_addr,
+				PAGE_ALIGN(pchannel_p->dest_mem_p.size),
+				DMA_TO_DEVICE);
+		ret = dma_mapping_error(pchannel_p->channel_p->device->dev, 
+				pchannel_p->dest_mem_p.phy_addr);
+                if (ret)
+			dev_err(pchannel_p->channel_p->device->dev, "dest mapping error.\n");
 		m2m_first=0;
 	}
 	while(1) {

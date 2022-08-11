@@ -7,8 +7,6 @@ obj-$(CONFIG_VIDEO_ET8EK8)	+= et8ek8/
 obj-$(CONFIG_VIDEO_CX25840) += cx25840/
 obj-$(CONFIG_VIDEO_M5MOLS)	+= m5mols/
 
-obj-$(CONFIG_VIDEO0_NUC980)      += nuvoton/
-obj-$(CONFIG_VIDEO1_NUC980)      += nuvoton/
 obj-$(CONFIG_VIDEO_APTINA_PLL) += aptina-pll.o
 obj-$(CONFIG_VIDEO_TVAUDIO) += tvaudio.o
 obj-$(CONFIG_VIDEO_TDA7432) += tda7432.o
@@ -127,3 +125,6 @@ obj-$(CONFIG_VIDEO_RDACM20)	+= rdacm20-camera_module.o
 obj-$(CONFIG_VIDEO_ST_MIPID02) += st-mipid02.o
 
 obj-$(CONFIG_SDR_MAX2175) += max2175.o
+obj-$(CONFIG_VIDEO_NT99141) += nt99141.o
+obj-$(CONFIG_VIDEO_HM1055) += hm1055.o
+

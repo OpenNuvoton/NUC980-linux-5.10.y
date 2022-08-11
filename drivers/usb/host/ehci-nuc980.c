@@ -15,6 +15,8 @@
 #include <linux/signal.h>
 #include <linux/gfp.h>
 #include <linux/of.h>
+#include <linux/pinctrl/consumer.h>
+#include <linux/pinctrl/machine.h>
 
 #include <linux/clk.h>
 #include <mach/irqs.h>
@@ -26,13 +28,12 @@
 
 
 //#define PORT_DEBUG
-
 //#define FORCE_PORT0_HOST
 
 
 #ifdef CONFIG_USE_OF
-static int  of_pm_vbus_off;
-static int  of_mfp_setting;
+static int  of_pm_vbus_off;	/* 1: turn-off VBUS when suspend; 0: keep VBUS power */
+static int  of_mfp_setting;	/* 1: use VBUS_EN (PE.10) MFP; 0: PE.10 for GPIO     */
 #endif
 
 
@@ -61,9 +62,7 @@ static int usb_nuc980_probe(const struct hc_driver *driver,
 #ifdef FORCE_PORT0_HOST
 	unsigned long flags;
 #endif
-#ifdef CONFIG_USE_OF
 	u32   val32[2];
-#endif
 
 	(void)p;
 
@@ -96,12 +95,9 @@ static int usb_nuc980_probe(const struct hc_driver *driver,
 	local_irq_restore(flags);
 #endif
 
-
-#ifdef CONFIG_USE_OF
-
 	p = devm_pinctrl_get_select_default(&pdev->dev);
 	if (IS_ERR(p)) {
-		return PTR_ERR(p);
+		printk("%s - Do not use VBUS_EN and OVC pins.\n", __func__);
 	}
 
 	if ((__raw_readl(REG_MFP_GPE_H) & 0x000F0000) == 0x00010000)
@@ -109,13 +105,11 @@ static int usb_nuc980_probe(const struct hc_driver *driver,
 	else
 		of_mfp_setting = 0;
 
-	//printk("of_mfp_setting = %d\n", of_mfp_setting);
-
 	if (of_property_read_u32_array(pdev->dev.of_node, "ov_active", val32, 1) != 0) {
 		printk("%s - can not get ov_active setting!\n", __func__);
 		return -EINVAL;
 	}
-	// printk("Over-current active level %s...\n", val32[0] ? "high" : "low");
+	printk("EHCI over-current active level %s...\n", val32[0] ? "high" : "low");
 	if (val32[0]) {
 		/* set over-current active high */
 		__raw_writel(__raw_readl(NUC980_VA_OHCI+0x204) &~0x8, (volatile void __iomem *)(NUC980_VA_OHCI+0x204));
@@ -142,57 +136,20 @@ static int usb_nuc980_probe(const struct hc_driver *driver,
 		pdev->dev.dma_mask = &pdev->dev.coherent_dma_mask;
 	if (!pdev->dev.coherent_dma_mask)
 		pdev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
-#else
-
-	/* multi-function pin select */
-#if defined(CONFIG_NUC980_USBH_PWREN_OVC_ON)
-
-	p = devm_pinctrl_get_select(&pdev->dev, "usbh_pwren_ovc_on");
-	if (IS_ERR(p)) {
-		dev_err(&pdev->dev, "unable to reserve USBH_PWREN and USB_OVC pins\n");
-		retval = PTR_ERR(p);
-		/* set over-current active high */
-		__raw_writel(__raw_readl(NUC980_VA_OHCI+0x204) &~0x8, (volatile void __iomem *)(NUC980_VA_OHCI+0x204));
-	} else {
-		/* set over-current active low */
-		__raw_writel(__raw_readl(NUC980_VA_OHCI+0x204) | 0x8, (volatile void __iomem *)(NUC980_VA_OHCI+0x204));
-	}
-
-#elif defined(CONFIG_NUC980_USBH_PWREN_ON)
-
-	p = devm_pinctrl_get_select(&pdev->dev, "usbh_pwren_on");
-	if (IS_ERR(p)) {
-		dev_err(&pdev->dev, "unable to reserve USBH_PWREN pin\n");
-		retval = PTR_ERR(p);
-	}
-	/* set over-current active high */
-	__raw_writel(__raw_readl(NUC980_VA_OHCI+0x204) &~0x8, (volatile void __iomem *)(NUC980_VA_OHCI+0x204));
-
-#elif defined(CONFIG_NUC980_USBH_OVC_ON)
-	p = devm_pinctrl_get_select(&pdev->dev, "usbh_ovc_on");
-	if (IS_ERR(p)) {
-		dev_err(&pdev->dev, "unable to reserve USB_OVC pin\n");
-		retval = PTR_ERR(p);
-		/* set over-current active high */
-		__raw_writel(__raw_readl(NUC980_VA_OHCI+0x204) &~0x8, (volatile void __iomem *)(NUC980_VA_OHCI+0x204));
-	} else {
-		/* set over-current active low */
-		__raw_writel(__raw_readl(NUC980_VA_OHCI+0x204) | 0x8, (volatile void __iomem *)(NUC980_VA_OHCI+0x204));
-	}
-#elif defined(CONFIG_NUC980_USBH_PWREN_OVC_OFF)
-
-	/* set over-current active high */
-	__raw_writel(__raw_readl(NUC980_VA_OHCI+0x204) &~0x8, (volatile void __iomem *)(NUC980_VA_OHCI+0x204));
-
-#endif
-
-
-#endif  // CONFIG_USE_OF
 
 	if (pdev->resource[1].flags != IORESOURCE_IRQ) {
 		pr_debug("resource[1] is not IORESOURCE_IRQ");
 		retval = -ENOMEM;
 	}
+
+	/*
+	 * Right now device-tree probed devices don't get dma_mask set.
+	 * Since shared usb code relies on it, set it here for now.
+	 * Once we have dma capability bindings this can go away.
+	 */
+	retval = dma_coerce_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
+	if (retval)
+		goto err1;
 
 	hcd = usb_create_hcd(driver, &pdev->dev, dev_name(&pdev->dev));
 	if (!hcd) {
@@ -225,7 +182,7 @@ static int usb_nuc980_probe(const struct hc_driver *driver,
 	__raw_writel(0x160, (volatile void __iomem *)physical_map_ehci+0xC4);
 	__raw_writel(0x520, (volatile void __iomem *)physical_map_ehci+0xC8);
 
-	//__raw_writel(__raw_readl(NUC980_VA_OHCI+0x204) | 0xfc0000, (volatile void __iomem *)(NUC980_VA_OHCI+0x204));
+	__raw_writel(__raw_readl(NUC980_VA_OHCI+0x204) | 0xfc0000, (volatile void __iomem *)(NUC980_VA_OHCI+0x204));
 
 	/* cache this readonly data; minimize chip reads */
 	ehci->hcs_params = readl(&ehci->caps->hcs_params);
@@ -239,7 +196,7 @@ static int usb_nuc980_probe(const struct hc_driver *driver,
 #ifdef PORT_DEBUG
 	kthread_run(port_dump_thread, NULL, "khubd");
 #endif
-
+	printk("NUC980 EHCI init done.\n");
 	return retval;
 
 err4:
@@ -249,7 +206,6 @@ err3:
 err2:
 	usb_put_hcd(hcd);
 err1:
-
 	return retval;
 }
 
@@ -270,44 +226,50 @@ static const struct hc_driver ehci_nuc980_hc_driver = {
 	/*
 	 * generic hardware linkage
 	 */
-	.irq = ehci_irq,
-	.flags = HCD_USB2|HCD_MEMORY,
-
+	.irq =			ehci_irq,
+	.flags =		HCD_MEMORY | HCD_DMA | HCD_USB2 | HCD_BH,
 	/*
 	 * basic lifecycle operations
 	 */
-	.reset = ehci_init,
-	.start = ehci_run,
-
-	.stop = ehci_stop,
-	.shutdown = ehci_shutdown,
+	.reset =		ehci_setup,
+	.start =		ehci_run,
+	.stop =			ehci_stop,
+	.shutdown =		ehci_shutdown,
 
 	/*
 	 * managing i/o requests and associated device resources
 	 */
-	.urb_enqueue = ehci_urb_enqueue,
-	.urb_dequeue = ehci_urb_dequeue,
-	.endpoint_disable = ehci_endpoint_disable,
-	.endpoint_reset     = ehci_endpoint_reset,
+	.urb_enqueue =		ehci_urb_enqueue,
+	.urb_dequeue =		ehci_urb_dequeue,
+	.endpoint_disable =	ehci_endpoint_disable,
+	.endpoint_reset =	ehci_endpoint_reset,
+	.clear_tt_buffer_complete =	ehci_clear_tt_buffer_complete,
 
 	/*
 	 * scheduling support
 	 */
-	.get_frame_number = ehci_get_frame,
+	.get_frame_number =	ehci_get_frame,
 
 	/*
 	 * root hub support
 	 */
-	.hub_status_data = ehci_hub_status_data,
-	.hub_control = ehci_hub_control,
+	.hub_status_data =	ehci_hub_status_data,
+	.hub_control =		ehci_hub_control,
+	.bus_suspend =		ehci_bus_suspend,
+	.bus_resume =		ehci_bus_resume,
+	.relinquish_port =	ehci_relinquish_port,
+	.port_handed_over =	ehci_port_handed_over,
+	.get_resuming_ports =	ehci_get_resuming_ports,
+
+	/*
+	 * device support
+	 */
+	.free_dev =		ehci_remove_device,
+
 #ifdef  CONFIG_PM
 	.bus_suspend = ehci_bus_suspend,
 	.bus_resume = ehci_bus_resume,
 #endif
-	.relinquish_port = ehci_relinquish_port,
-	.port_handed_over = ehci_port_handed_over,
-
-	.clear_tt_buffer_complete = ehci_clear_tt_buffer_complete,
 };
 
 static int ehci_nuc980_probe(struct platform_device *pdev)
@@ -343,7 +305,6 @@ static int ehci_nuc980_pm_suspend(struct device *dev)
 	__raw_writel(0x20, NUC980_VA_EHCI+0xC8);
 #endif
 
-#ifdef CONFIG_USE_OF
 	if (of_pm_vbus_off) {
 		if (of_mfp_setting == 1) {
 			__raw_writel(__raw_readl(REG_GPIOE_DOUT) & ~(1<<12), REG_GPIOE_DOUT);     // PE.12 output low
@@ -351,17 +312,6 @@ static int ehci_nuc980_pm_suspend(struct device *dev)
 			__raw_writel(__raw_readl(REG_MFP_GPE_H) & 0xFFF0FFFF, REG_MFP_GPE_H);     // PE.12 GPIO mode
 		}
 	}
-#else   /* !CONFIG_USE_OF */
-
-#if defined(CONFIG_USB_NUC980_PM_VBUS_OFF) && defined(CONFIG_NUC980_USBH_PWREN_ON)
-	/* turn off port power */
-	__raw_writel(__raw_readl(REG_GPIOE_DOUT) & ~(1<<12), REG_GPIOE_DOUT);     // PE.12 output low
-	__raw_writel(((__raw_readl(REG_GPIOE_MODE) & 0xFCFFFFFF) | (1<<24)), REG_GPIOE_MODE);   // PE.12 output mode
-	__raw_writel(__raw_readl(REG_MFP_GPE_H) & 0xFFF0FFFF, REG_MFP_GPE_H);     // PE.12 GPIO mode
-#endif
-
-#endif  /* end of CONFIG_USE_OFF */
-
 	return ret;
 }
 
@@ -369,19 +319,11 @@ static int ehci_nuc980_pm_resume(struct device *dev)
 {
 	struct usb_hcd *hcd = dev_get_drvdata(dev);
 
-#ifdef CONFIG_USE_OF
 	if (of_pm_vbus_off) {
 		if (of_mfp_setting == 1) {
 			__raw_writel(__raw_readl(REG_MFP_GPE_H) | 0x00010000, REG_MFP_GPE_H);       // PE.12 for USBH_PWREN
 		}
 	}
-#else  /* !CONFIG_USE_OF */
-
-#if defined(CONFIG_USB_NUC980_PM_VBUS_OFF) && defined(CONFIG_NUC980_USBH_PWREN_ON)
-	__raw_writel(__raw_readl(REG_MFP_GPE_H) | 0x00010000, REG_MFP_GPE_H);       // PE.12 for USBH_PWREN
-#endif
-
-#endif  /* end of CONFIG_USE_OF */
 
 	/* re-enable PHY0 and PHY1 */
 	__raw_writel(0x160, NUC980_VA_EHCI+0xC4);
@@ -410,7 +352,6 @@ MODULE_DEVICE_TABLE(of, nuc980_ehci_of_match);
 
 
 static struct platform_driver ehci_hcd_nuc980_driver = {
-
 	.probe = ehci_nuc980_probe,
 	.remove = ehci_nuc980_remove,
 	.driver = {
@@ -420,3 +361,4 @@ static struct platform_driver ehci_hcd_nuc980_driver = {
 		.of_match_table = of_match_ptr(nuc980_ehci_of_match),
 	},
 };
+

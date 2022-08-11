@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0
 /*
  * Device Tree Source for NUC980
  *
@@ -11,11 +12,13 @@
  * http://www.gnu.org/copyleft/gpl.html
  */
 
+#include <dt-bindings/gpio/gpio.h>
+
 / {
-	#address-cells = <1>;
-	#size-cells = <1>;
 	model = "Nuvoton NUC980 family SoC";
 	compatible = "nuvoton,nuc980";
+	#address-cells = <1>;
+	#size-cells = <1>;
 	interrupt-parent = <&aic>;
 
 	cpus {
@@ -635,7 +638,7 @@
 				};
 			};
 
-			usbd {
+			usbdev {
 				pinctrl_usbd: usbd-vbusvld{
 					nuvoton,pins =
 						<4 0xb 1 0>;
@@ -755,19 +758,19 @@
 						 //0 0xE 0x6 0	 /* eint1_A14 */
 
 						 //3 0x0 0x4 0   /* eint2_D0 */
-						 4 0xA 0x5 0	 /* eint2_E10 */
+						 //4 0xA 0x5 0	 /* eint2_E10 */
 						 //1 0x3 0x3 0	 /* eint2_B3 */
-						 //1 0xD 0x2 0	 /* eint2_B13 */
+						 1 0xD 0x2 0	 /* eint2_B13 */
 
 						 //3 0x1 0x4 0   /* eint3_D1 */
-						 4 0xC 0x5 0	 /* eint3_E12 */
-						 //6 0xF 0x4 0	 /* eint3_G15 */
+						 //4 0xC 0x5 0	 /* eint3_E12 */
+						 6 0xF 0x4 0	 /* eint3_G15 */
 						 >;
 				};
 			};
 
-			cap0 {
-				pinctrl_cap0: cap0 {
+			ccap0 {
+				pinctrl_ccap0: ccap0 {
 					nuvoton,pins =
 						<2 0x3 0x2 0
 						 2 0x4 0x2 0
@@ -785,8 +788,8 @@
 				};
 			};
 
-			cap1 {
-				pinctrl_cap1: cap1 {
+			ccap1 {
+				pinctrl_ccap1: ccap1 {
 					nuvoton,pins =
 						<4 0xc 0x7 0
 						 5 0xa 0x7 0
@@ -1068,15 +1071,9 @@
 			etimer0 {
 				pinctrl_etimer0: etimer0 {
 					nuvoton,pins =
-						<0 0x0 0x6 0
-						 1 0x3 0x5 0
-						 1 0x1 0x5 0
-						 //3 0x6 0x3 0
-						 //2 0x0 0x7 0
-						 //1 0x8 0x7 0
-						 //5 0x0 0x3 0
-						 //1 0x9 0x3 0
-						 //1 0xA 0x3 0
+						<3 0x6 0x3 0//PD6_TM0_ECNT
+						 1 0x9 0x3 0//PB9_TM0_TGL
+						 1 0xA 0x3 0//PB10_TM0_CAP
 						>;
 				};
 			};
@@ -1084,18 +1081,9 @@
 			etimer1 {
 				pinctrl_etimer1: etimer1 {
 					nuvoton,pins =
-						<0 0x1 0x6 0
-						 0 0xE 0x3 0
-						 0 0xD 0x3 0
-						 //3 0x7 0x3 0
-						 //3 0x0 0x3 0
-						 //3 0x1 0x3 0
-						 //5 0x1 0x3 0
-						 //6 0xB 0x3 0
-						 //5 0x9 0x3 0
-						 //0 0x1 0x6 0
-						 //5 0x8 0x3 0
-						 //6 0xC 0x3 0
+						<3 0x7 0x3 0//PD7_TM1_ECNT
+						 3 0x0 0x3 0//PD0_TM1_TGL
+						 3 0x1 0x3 0//PD1_TM1_CAP
 						>;
 				};
 			};
@@ -1103,15 +1091,9 @@
 			etimer2 {
 				pinctrl_etimer2: etimer2 {
 					nuvoton,pins =
-						<0 0x2 0x6 0
-						 0 0xA 0x3 0
-						 0 0x9 0x3 0
-						 //3 0x8 0x3 0
-						 //1 0xC 0x3 0
-						 //1 0xB 0x3 0
-						 //5 0x2 0x3 0
-						 //3 0xC 0x2 0
-						 //3 0xD 0x2 0
+						<0 0x2 0x6 0//PA2_TM2_ECNT
+						 1 0xC 0x3 0//PB12_TM2_TGL
+						 1 0xB 0x3 0//PB11_TM2_CAP
 						>;
 				};
 			};
@@ -1119,75 +1101,34 @@
 			etimer3 {
 				pinctrl_etimer3: etimer3 {
 					nuvoton,pins =
-						<0 0x3 0x6 0
-						 0 0x8 0x3 0
-						 0 0x7 0x3 0
-						 //3 0x9 0x3 0
-						 //3 0xE 0x2 0
-						 //3 0xF 0x2 0
-						 //5 0x3 0x3 0
-						 //3 0xE 0x2 0
-						 //3 0xF 0x2 0
+						<0 0x3 0x6 0//PA3_TM3_ECNT
+						 3 0xE 0x2 0//PD14_TM3_TGL
+						 3 0xF 0x2 0//PD15_TM3_CAP
 						>;
 				};
 			};
 
-			pwm00 {
-				pinctrl_pwm00: pwm00 {
+			pwm0 {
+				pinctrl_pwm00: pwm0 {
 					nuvoton,pins =
-						<6 0x0 0x6 0>;
+						<6 0x0 0x6 0
+						6 0x1 0x6 0
+						6 0x2 0x6 0
+						3 0xF 0x6 0
+						>;
 				};
 			};
 
-			pwm01 {
-				pinctrl_pwm01: pwm01 {
+			pwm1 {
+				pinctrl_pwm10: pwm1 {
 					nuvoton,pins =
-						<6 0x1 0x6 0>;
+						<1 0xC 0x2 0
+						1 0xB 0x2 0
+						1 0xA 0x2 0
+						1 0x9 0x2 0
+						>;
 				};
 			};
-
-			pwm02 {
-				pinctrl_pwm02: pwm02 {
-					nuvoton,pins =
-						<6 0x2 0x6 0>;
-				};
-			};
-
-			pwm03 {
-				pinctrl_pwm03: pwm03 {
-					nuvoton,pins =
-						<6 0x3 0x6 0>;
-				};
-			};
-
-			pwm10 {
-				pinctrl_pwm10: pwm10 {
-					nuvoton,pins =
-						<1 0xC 0x2 0>;
-				};
-			};
-
-			pwm11 {
-				pinctrl_pwm11: pwm11 {
-					nuvoton,pins =
-						<1 0xB 0x2 0>;
-				};
-			};
-
-			pwm12 {
-				pinctrl_pwm12: pwm12 {
-					nuvoton,pins =
-						<1 0xA 0x2 0>;
-				};
-			};
-
-			pwm13 {
-				pinctrl_pwm13: pwm13 {
-					nuvoton,pins =
-						<1 0x9 0x2 0>;
-				};
-			};
-
 
 			sc0 {
 				pinctrl_sc0_PA: sc0-PA {
@@ -1495,12 +1436,12 @@
 			/* 1st: 0(Disable)/1(Enable) */
 			/* 2nd: 0(PD0)/1(PE10)/2(PB3)/3(PB13) */
 			/* 3rd: 0(both)/1(rasing)/2(falling)/3(heigh level)/4(low level) */
-			eint2-config = <0 1 0>;
+			eint2-config = <0 3 0>;
 
 			/* 1st: 0(Disable)/1(Enable) */
 			/* 2nd: 0(PD1)/1(PE12)/2(PG15) */
 			/* 3rd: 0(both)/1(rasing)/2(falling)/3(heigh level)/4(low level) */
-			eint3-config = <0 1 0>;
+			eint3-config = <0 2 0>;
 			status = "okay";
 		};
 
@@ -1514,17 +1455,55 @@
 			status = "disabled";
 		};
 
-		qspi0: qspi0@b0060000 {
+		qspi0: spi@b0060000 {
 			compatible = "nuvoton,nuc980-qspi0";
 			reg = <0xb0060000 0x1000>;
 			interrupts = <51 4 1>;
 			map-addr = <0xf0060000>;
 			pinctrl-names = "default";
 			pinctrl-0 = <&pinctrl_qspi0>;
-			status = "disabled";
+			status = "okay";
+
+                        #address-cells = <1>;
+                        #size-cells = <0>;
+
+                        num_cs  = <2>;
+                        lsb      = <0>;
+                        txneg   = <1>;
+                        rxneg   = <0>;
+                        clkpol  = <0>;
+                        divider = <4>;
+                        sleep   = <0>;
+                        txbitlen = <8>;
+                        bus_num = <0>;
+
+			flash: flash@0 {
+				/*compatible = "winbond,w25q128";*/
+				compatible = "spi-nand";
+                                #address-cells = <1>;
+                                #size-cells = <1>;
+                                reg = <0>;
+                                spi-max-frequency = <30000000>;
+
+                                partition@0 {
+                                        label = "kernel";
+                                        reg = <0x00000000 0x0800000>;
+                                };
+                                partition@1 {
+                                        label = "rootfs";
+                                        reg = <0x0800000 0x0800000>;
+                                };
+                        };
+
+			spidev0: spi@1 {
+                        compatible = "semtech,sx1301";
+                        reg = <1>;
+			spi-max-frequency = <12000000>;
+			};
+
 		};
 
-		spi0: spi0@b0061000 {
+		spi0: spi@b0061000 {
 			compatible = "nuvoton,nuc980-spi0";
 			reg = <0xb0061000 0x1000>;
 			interrupts = <52 4 1>;
@@ -1532,9 +1511,23 @@
 			pinctrl-names = "default";
 			pinctrl-0 = <&pinctrl_spi0>;
 			status = "disabled";
+
+                        #address-cells = <1>;
+                        #size-cells = <0>;
+
+                        num_cs  = <2>;
+                        lsb      = <0>;
+                        txneg   = <1>;
+                        rxneg   = <0>;
+                        clkpol  = <0>;
+                        divider = <4>;
+                        sleep   = <0>;
+                        txbitlen = <8>;
+                        bus_num = <1>;
+
 		};
 
-		spi1: spi1@b0062000 {
+		spi1: spi@b0062000 {
 			compatible = "nuvoton,nuc980-spi1";
 			reg = <0xb0062000 0x1000>;
 			interrupts = <50 4 1>;
@@ -1542,6 +1535,20 @@
 			pinctrl-names = "default";
 			pinctrl-0 = <&pinctrl_spi1>;
 			status = "disabled";
+
+                        #address-cells = <1>;
+                        #size-cells = <0>;
+
+                        num_cs  = <2>;
+                        lsb      = <0>;
+                        txneg   = <1>;
+                        rxneg   = <0>;
+                        clkpol  = <0>;
+                        divider = <4>;
+                        sleep   = <0>;
+                        txbitlen = <8>;
+                        bus_num = <2>;
+
 		};
 
 		i2c0: i2c0@b0080000 {
@@ -1572,32 +1579,6 @@
 
 			#address-cells = <1>;
 			#size-cells = <0>;
-			/*
-			cap1_nt99141@2a {
-				compatible = "nuvoton,cap1-nt99141";
-				reg = <0x2a>;
-			};
-			cap1_nt99050@21 {
-				compatible = "nuvoton,cap1-nt99050";
-				reg = <0x21>;
-			};
-			cap1_ov7725@21 {
-				compatible = "nuvoton,cap1-ov7725";
-				reg = <0x21>;
-			};
-			cap1_ov5640@3c {
-				compatible = "nuvoton,cap1-ov5640";
-				reg = <0x3c>;
-			};
-			cap1_tw9912@44 {
-				compatible = "nuvoton,cap1-tw9912";
-				reg = <0x44>;
-			};
-                        cap1_gc0308@21 {
-                                compatible = "nuvoton,cap1-gc0308";
-                                reg = <0x21>;
-                        };
-			*/
 		};
 
 		i2c2: i2c2@b0082000 {
@@ -1613,32 +1594,6 @@
 
 			#address-cells = <1>;
 			#size-cells = <0>;
-			/*
-			cap0_nt99141@2a {
-				compatible = "nuvoton,cap0-nt99141";
-				reg = <0x2a>;
-			};
-			cap0_nt99050@21 {
-				compatible = "nuvoton,cap0-nt99050";
-				reg = <0x21>;
-			};
-			cap0_ov7725@21 {
-				compatible = "nuvoton,cap0-ov7725";
-				reg = <0x21>;
-			};
-			cap0_ov5640@3c {
-				compatible = "nuvoton,cap0-ov5640";
-				reg = <0x3c>;
-			};
-			cap0_tw9912@44 {
-				compatible = "nuvoton,cap0-tw9912";
-				reg = <0x44>;
-			};
-                        cap0_gc0308@21 {
-                                compatible = "nuvoton,cap0-gc0308";
-                                reg = <0x21>;
-                        };
-			*/
 		};
 
 		i2c3: i2c3@b0083000 {
@@ -1697,91 +1652,23 @@
 			status = "disabled";
 		};
 
-		pwm00: pwm00@b0058000 {
+		pwm0: pwm@b0058000 {
 			compatible = "nuvoton,nuc980-pwm0";
 			reg = <0xb0058000 0x100>;
 			interrupts = <60 4 1>;
 			id = <0>;
-			map-addr = <0xf0058000>;
 			pinctrl-names = "default";
 			pinctrl-0 = <&pinctrl_pwm00>;
 			status = "disabled";
 		};
 
-		pwm01: pwm01@b0058000 {
-			compatible = "nuvoton,nuc980-pwm0";
-			reg = <0xb0058000 0x100>;
-			interrupts = <60 4 1>;
-			id = <1>;
-			map-addr = <0xf0058000>;
-			pinctrl-names = "default";
-			pinctrl-0 = <&pinctrl_pwm01>;
-			status = "disabled";
-		};
-
-		pwm02: pwm02@b0058000 {
-			compatible = "nuvoton,nuc980-pwm0";
-			reg = <0xb0058000 0x100>;
-			interrupts = <60 4 1>;
-			id = <2>;
-			map-addr = <0xf0058000>;
-			pinctrl-names = "default";
-			pinctrl-0 = <&pinctrl_pwm02>;
-			status = "disabled";
-		};
-
-		pwm03: pwm03@b0058000 {
-			compatible = "nuvoton,nuc980-pwm0";
-			reg = <0xb0058000 0x100>;
-			interrupts = <60 4 1>;
-			id = <3>;
-			map-addr = <0xf0058000>;
-			pinctrl-names = "default";
-			pinctrl-0 = <&pinctrl_pwm03>;
-			status = "disabled";
-		};
-
-		pwm10: pwm10@b0059000 {
+		pwm1: pwm@b0059000 {
 			compatible = "nuvoton,nuc980-pwm1";
 			reg = <0xb0059000 0x100>;
 			interrupts = <61 4 1>;
 			id = <4>;
-			map-addr = <0xf0059000>;
 			pinctrl-names = "default";
 			pinctrl-0 = <&pinctrl_pwm10>;
-			status = "disabled";
-		};
-
-		pwm11: pwm11@b0059000 {
-			compatible = "nuvoton,nuc980-pwm1";
-			reg = <0xb0059000 0x100>;
-			interrupts = <61 4 1>;
-			id = <5>;
-			map-addr = <0xf0059000>;
-			pinctrl-names = "default";
-			pinctrl-0 = <&pinctrl_pwm11>;
-			status = "disabled";
-		};
-
-		pwm12: pwm12@b0059000 {
-			compatible = "nuvoton,nuc980-pwm1";
-			reg = <0xb0059000 0x100>;
-			interrupts = <61 4 1>;
-			id = <6>;
-			map-addr = <0xf0059000>;
-			pinctrl-names = "default";
-			pinctrl-0 = <&pinctrl_pwm12>;
-			status = "disabled";
-		};
-
-		pwm13: pwm13@b0059000 {
-			compatible = "nuvoton,nuc980-pwm1";
-			reg = <0xb0059000 0x100>;
-			interrupts = <61 4 1>;
-			id = <7>;
-			map-addr = <0xf0059000>;
-			pinctrl-names = "default";
-			pinctrl-0 = <&pinctrl_pwm13>;
 			status = "disabled";
 		};
 
@@ -1844,7 +1731,7 @@
 			interrupts = <29 4 1>;
 			pinctrl-names = "default";
 			pinctrl-0 = <&pinctrl_usbd>;
-			status = "disabled";
+			status = "okay";
 		};
 
 		sdh@b0018000 {
@@ -1862,24 +1749,26 @@
 			interrupts = <28 4 1>;
 			pinctrl-names = "default";
 			pinctrl-0 = <&pinctrl_sd0>;
-			status = "disabled";
+			status = "okay";
 		};
 
 		usbh_ehci@b0015000 {
-			compatible = "nuvoton,nuc980-ehci", "usbh-ehci";
+			compatible = "nuvoton,nuc980-ehci";
 			reg = <0xb0015000 0x1000>;
 			interrupts = <23 4 1>;
 			pinctrl-names = "default";
 			pinctrl-0 = <&pinctrl_usbh_ppwr_ovc>;
-			ov_active = <0>;				 /* over-current active level, 1: active high; 0: active low */
+			ov_active = <0>; 				/* over-current active level, 1: active high; 0: active low */
+			pm_vbus_off = <0>;				/* 1: turn-off VBUS when suspend; 0: keep VBUS power */
 			status = "okay";
 		};
 
 		usbh_ohci@b0017000{
-			compatible = "nuvoton,nuc980-ohci", "usbh-ohci";
+			compatible = "nuvoton,nuc980-ohci";
 			reg = <0xb0017000 0x1000>;
 			interrupts = <24 4 1>;
 			ov_active = <0>;				 /* over-current active level, 1: active high; 0: active low */
+			pm_vbus_off = <0>;				/* 1: turn-off VBUS when suspend; 0: keep VBUS power */
 			status = "okay";
 		};
 
@@ -1972,25 +1861,86 @@
 			status = "disabled";
 		};
 
-		cap0@b0024000 {
-			compatible = "nuvoton,nuc980-cap0";
+		ccap0@b0024000 {
+			compatible = "nuvoton,nuc980-ccap0";
 			reg = <0xb0024000 0x1000>;
 			interrupts = <14 4 1>;
-			pinctrl-names = "default";
-			pinctrl-0 = <&pinctrl_cap0>;
 			status = "disabled";
-			frequency = <24000000>;
-			model = "nt99050";      /*Support ov7725, nt99141, nt99050, ov5640, tw9912 or gc0308 */
+			port {
+				/* Parallel bus endpoint */
+				ccap0_1: endpoint {
+					remote-endpoint = <&hm1055_0>;
+					hsync-active = <0>;     /* Active low */
+					vsync-active = <0>;     /* Active low */
+					pclk-sample = <1>;      /* Rising */
+				};
+			};
 		};
-		cap1@b0014000 {
-			compatible = "nuvoton,nuc980-cap1";
+
+		i2c_gpio0: i2c-gpio-0 {
+			compatible = "i2c-gpio";
+			sda-gpios=<&gpio 0x27 (GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN)>;
+			scl-gpios=<&gpio 0x25 (GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN)>;
+			i2c-gpio,delay-us = <20>;        /* ~100 kHz */
+			#address-cells = <1>;
+			#size-cells = <0>;
+			status = "disabled";
+			hm1055@24 {
+				compatible = "himax,hm1055";
+				reg = <0x24>;
+				pinctrl-names = "default";
+				pinctrl-0 = <&pinctrl_ccap0>;
+				reset-gpios = <&gpio 0x47 GPIO_ACTIVE_LOW>; /* PC7 */
+				powerdown-gpios = <&gpio 0x21 GPIO_ACTIVE_HIGH>; /* PB1 */
+				port-number = <0>;
+				frequency = <24000000>;
+				port {
+					hm1055_0: endpoint {
+						remote-endpoint = <&ccap0_1>;
+					};
+				};
+                        };
+		};
+
+		ccap1@b0014000 {
+			compatible = "nuvoton,nuc980-ccap1";
 			reg = <0xb0014000 0x1000>;
 			interrupts = <33 4 1>;
-			pinctrl-names = "default";
-			pinctrl-0 = <&pinctrl_cap1>;
 			status = "disabled";
-			frequency = <24000000>;
-			model = "nt99050";      /*Support ov7725, nt99141, nt99050, ov5640, tw9912 or gc0308 */
+			port {
+				/* Parallel bus endpoint */
+				ccap1_1: endpoint {
+					remote-endpoint = <&hm1055_1>;
+					hsync-active = <0>;     /* Active low */
+					vsync-active = <0>;     /* Active low */
+					pclk-sample = <1>;      /* Rising */
+				};
+			};
+		};
+
+		i2c_gpio1: i2c-gpio-1 {
+			compatible = "i2c-gpio";
+			sda-gpios=<&gpio 0x26 (GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN)>;
+			scl-gpios=<&gpio 0x24 (GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN)>;
+			i2c-gpio,delay-us = <20>;        /* ~100 kHz */
+			#address-cells = <1>;
+			#size-cells = <0>;
+			status = "disabled";
+			hm1055: camera@24  {
+				compatible = "himax,hm1055";
+				reg = <0x24>;
+				pinctrl-names = "default";
+				pinctrl-0 = <&pinctrl_ccap1>;
+				reset-gpios = <&gpio 0x8A GPIO_ACTIVE_LOW>; /* PE10 */
+				powerdown-gpios = <&gpio 0x40 GPIO_ACTIVE_HIGH>; /* PC0 */
+				port-number = <1>;
+				frequency = <24000000>;
+				port {
+					hm1055_1: endpoint {
+						remote-endpoint = <&ccap1_1>;
+					};
+				};
+			};
 		};
 
 		dma@b0008000 {
@@ -2008,7 +1958,7 @@
 			status = "disabled";
 		};
 
-		i2s: i2s@b0020000 {
+		i2s@b0020000 {
 			compatible = "nuvoton,nuc980-audio-i2s";
 			reg = <0xb0020000 0x100>;
 			interrupts = <12 4 1>;

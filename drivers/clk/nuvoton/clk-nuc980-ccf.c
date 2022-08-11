@@ -34,8 +34,8 @@ static const char *usb_sel_clks[] = { "dummy", "dummy", "usbphy0_div", "usbphy1_
 static const char *qspi0_sel_clks[] = { "xin", "pclk0_div", "apll", "upll", };
 static const char *spi0_sel_clks[] = { "xin", "pclk1_div", "apll", "upll", };
 static const char *spi1_sel_clks[] = { "xin", "pclk0_div", "apll", "upll", };
-static const char *cap0_sel_clks[] = { "xin", "dummy", "cap0_aplldiv", "cap0_uplldiv", };
-static const char *cap1_sel_clks[] = { "xin", "dummy", "cap1_aplldiv", "cap1_uplldiv", };
+static const char *ccap0_sel_clks[] = { "xin", "dummy", "ccap0_aplldiv", "ccap0_uplldiv", };
+static const char *ccap1_sel_clks[] = { "xin", "dummy", "ccap1_aplldiv", "ccap1_uplldiv", };
 static const char *uart0_sel_clks[] = { "xin", "xin32k", "apll", "upll", };
 static const char *uart1_sel_clks[] = { "xin", "xin32k", "apll", "upll", };
 static const char *uart2_sel_clks[] = { "xin", "xin32k", "apll", "upll", };
@@ -68,9 +68,9 @@ enum nuc980_clks {
 	hclk_div, hclk_gate, dram_gate, sram_gate,
 
 	emac1_gate, emac1_eclk_div, emac1_eclk_gate, usbh_gate, usbd_gate,
-	fmi_gate, nand_gate, crypto_gate, sdh0_gate, cap1_gate,
+	fmi_gate, nand_gate, crypto_gate, sdh0_gate, ccap1_gate,
 
-	emac0_gate, emac0_eclk_div, emac0_eclk_gate, sdh1_gate, audio_gate, cap0_gate, sensor_gate,
+	emac0_gate, emac0_eclk_div, emac0_eclk_gate, sdh1_gate, audio_gate, ccap0_gate, sensor_gate,
 
 	// eclk
 	audio_eclk_mux, audio_eclk_div, audio_eclk_gate,
@@ -78,8 +78,8 @@ enum nuc980_clks {
 	qspi0_eclk_mux, qspi0_eclk_gate,
 	spi0_eclk_mux, spi0_eclk_gate,
 	spi1_eclk_mux, spi1_eclk_gate,
-	cap1_aplldiv, cap1_uplldiv, cap1_eclk_mux, cap1_eclk_div, cap1_eclk_gate,
-	cap0_aplldiv, cap0_uplldiv, cap0_eclk_mux, cap0_eclk_div, cap0_eclk_gate,
+	ccap1_aplldiv, ccap1_uplldiv, ccap1_eclk_mux, ccap1_eclk_div, ccap1_eclk_gate,
+	ccap0_aplldiv, ccap0_uplldiv, ccap0_eclk_mux, ccap0_eclk_div, ccap0_eclk_gate,
 	uart0_eclk_mux, uart0_eclk_div, uart0_eclk_gate,
 	uart1_eclk_mux, uart1_eclk_div, uart1_eclk_gate,
 	uart2_eclk_mux, uart2_eclk_div, uart2_eclk_gate,
@@ -186,7 +186,7 @@ int __init nuc980_init_clocks(void)
 	clk[nand_gate] = nuc980_clk_gate("nand_hclk_gate", "hclk_div", REG_CLK_HCLKEN, 21);
 	clk[crypto_gate] = nuc980_clk_gate("crypto_hclk_gate", "hclk_div", REG_CLK_HCLKEN, 23);
 	clk[sdh0_gate] = nuc980_clk_gate("sdh0_hclk_gate", "hclk_div", REG_CLK_HCLKEN, 22);
-	clk[cap1_gate] = nuc980_clk_gate("cap1_hclk_gate", "hclk_div", REG_CLK_HCLKEN, 31);
+	clk[ccap1_gate] = nuc980_clk_gate("ccap1_hclk_gate", "hclk_div", REG_CLK_HCLKEN, 31);
 
 	// HCLK4
 	clk[emac0_gate] = nuc980_clk_gate("emac0_hclk_gate", "hclk_div", REG_CLK_HCLKEN, 16);
@@ -194,7 +194,7 @@ int __init nuc980_init_clocks(void)
 	clk[emac0_eclk_gate] = nuc980_clk_gate("emac0_eclk_gate", "emac0_eclk_div", REG_CLK_HCLKEN, 16);
 	clk[sdh1_gate] = nuc980_clk_gate("sdh1_hclk_gate", "hclk_div", REG_CLK_HCLKEN, 30);
 	clk[audio_gate] = nuc980_clk_gate("audio_hclk_gate", "hclk_div", REG_CLK_HCLKEN, 24);
-	clk[cap0_gate] = nuc980_clk_gate("cap0_hclk_gate", "hclk_div", REG_CLK_HCLKEN, 26);
+	clk[ccap0_gate] = nuc980_clk_gate("ccap0_hclk_gate", "hclk_div", REG_CLK_HCLKEN, 26);
 	clk[sensor_gate] = nuc980_clk_gate("sensor_hclk_gate", "hclk_div", REG_CLK_HCLKEN, 27); // ?? block diagram
 
 	// ECLK
@@ -222,18 +222,18 @@ int __init nuc980_init_clocks(void)
 	clk[spi1_eclk_gate] = nuc980_clk_gate("spi1_eclk_gate", "spi1_eclk_mux", REG_CLK_PCLKEN1, 6);
 
 	// -CAP1
-	clk[cap1_aplldiv] = nuc980_clk_divider("cap1_aplldiv", "apll", REG_CLK_DIV2, 16, 3);
-	clk[cap1_uplldiv] = nuc980_clk_divider("cap1_uplldiv", "upll", REG_CLK_DIV2, 16, 3);
-	clk[cap1_eclk_mux] = nuc980_clk_mux("cap1_eclk_mux", REG_CLK_DIV2, 19, 2, cap1_sel_clks, ARRAY_SIZE(cap1_sel_clks));
-	clk[cap1_eclk_div] = nuc980_clk_divider("cap1_eclk_div", "cap1_eclk_mux", REG_CLK_DIV2, 24, 4);
-	clk[cap1_eclk_gate] = nuc980_clk_gate("cap1_eclk_gate", "cap1_eclk_div", REG_CLK_HCLKEN, 31);
+	clk[ccap1_aplldiv] = nuc980_clk_divider("ccap1_aplldiv", "apll", REG_CLK_DIV2, 16, 3);
+	clk[ccap1_uplldiv] = nuc980_clk_divider("ccap1_uplldiv", "upll", REG_CLK_DIV2, 16, 3);
+	clk[ccap1_eclk_mux] = nuc980_clk_mux("ccap1_eclk_mux", REG_CLK_DIV2, 19, 2, ccap1_sel_clks, ARRAY_SIZE(ccap1_sel_clks));
+	clk[ccap1_eclk_div] = nuc980_clk_divider("ccap1_eclk_div", "ccap1_eclk_mux", REG_CLK_DIV2, 24, 4);
+	clk[ccap1_eclk_gate] = nuc980_clk_gate("ccap1_eclk_gate", "ccap1_eclk_div", REG_CLK_HCLKEN, 31);
 
 	// -CAP0
-	clk[cap0_aplldiv] = nuc980_clk_divider("cap0_aplldiv", "apll", REG_CLK_DIV3, 16, 3);
-	clk[cap0_uplldiv] = nuc980_clk_divider("cap0_uplldiv", "upll", REG_CLK_DIV3, 16, 3);
-	clk[cap0_eclk_mux] = nuc980_clk_mux("cap0_eclk_mux", REG_CLK_DIV3, 19, 2, cap0_sel_clks, ARRAY_SIZE(cap0_sel_clks));
-	clk[cap0_eclk_div] = nuc980_clk_divider("cap0_eclk_div", "cap0_eclk_mux", REG_CLK_DIV3, 24, 4);
-	clk[cap0_eclk_gate] = nuc980_clk_gate("cap0_eclk_gate", "cap0_eclk_div", REG_CLK_HCLKEN, 26);
+	clk[ccap0_aplldiv] = nuc980_clk_divider("ccap0_aplldiv", "apll", REG_CLK_DIV3, 16, 3);
+	clk[ccap0_uplldiv] = nuc980_clk_divider("ccap0_uplldiv", "upll", REG_CLK_DIV3, 16, 3);
+	clk[ccap0_eclk_mux] = nuc980_clk_mux("ccap0_eclk_mux", REG_CLK_DIV3, 19, 2, ccap0_sel_clks, ARRAY_SIZE(ccap0_sel_clks));
+	clk[ccap0_eclk_div] = nuc980_clk_divider("ccap0_eclk_div", "ccap0_eclk_mux", REG_CLK_DIV3, 24, 4);
+	clk[ccap0_eclk_gate] = nuc980_clk_gate("ccap0_eclk_gate", "ccap0_eclk_div", REG_CLK_HCLKEN, 26);
 
 	// -UART0
 	clk[uart0_eclk_mux] = nuc980_clk_mux("uart0_eclk_mux", REG_CLK_DIV4, 3, 2, uart0_sel_clks, ARRAY_SIZE(uart0_sel_clks));
@@ -445,7 +445,7 @@ int __init nuc980_init_clocks(void)
 	clk_register_clkdev(clk[nand_gate], "nand_hclk", NULL);
 	clk_register_clkdev(clk[sdh0_gate], "sdh0_hclk", NULL);
 	clk_register_clkdev(clk[crypto_gate], "crypto_hclk", NULL);
-	clk_register_clkdev(clk[cap1_gate], "cap1_hclk", NULL);
+	clk_register_clkdev(clk[ccap1_gate], "ccap1_hclk", NULL);
 
 	//HCLK4
 	clk_register_clkdev(clk[emac0_gate], "emac0_hclk", NULL);
@@ -453,7 +453,7 @@ int __init nuc980_init_clocks(void)
 	clk_register_clkdev(clk[emac0_eclk_gate], "emac0_eclk", NULL);
 	clk_register_clkdev(clk[sdh1_gate], "sdh1_hclk", NULL);
 	clk_register_clkdev(clk[audio_gate], "audio_hclk", NULL);
-	clk_register_clkdev(clk[cap0_gate], "cap0_hclk", NULL);
+	clk_register_clkdev(clk[ccap0_gate], "ccap0_hclk", NULL);
 	clk_register_clkdev(clk[sensor_gate], "sensor_hclk", NULL);
 
 	// ECLK
@@ -475,17 +475,17 @@ int __init nuc980_init_clocks(void)
 	clk_register_clkdev(clk[spi1_eclk_mux], "spi1_eclk_mux", NULL);
 	clk_register_clkdev(clk[spi1_eclk_gate], "spi1_eclk", NULL);
 
-	clk_register_clkdev(clk[cap1_aplldiv], "cap1_aplldiv", NULL);
-	clk_register_clkdev(clk[cap1_uplldiv], "cap1_uplldiv", NULL);
-	clk_register_clkdev(clk[cap1_eclk_mux], "cap1_eclk_mux", NULL);
-	clk_register_clkdev(clk[cap1_eclk_div], "cap1_eclk_div", NULL);
-	clk_register_clkdev(clk[cap1_eclk_gate], "cap1_eclk", NULL);
+	clk_register_clkdev(clk[ccap1_aplldiv], "ccap1_aplldiv", NULL);
+	clk_register_clkdev(clk[ccap1_uplldiv], "ccap1_uplldiv", NULL);
+	clk_register_clkdev(clk[ccap1_eclk_mux], "ccap1_eclk_mux", NULL);
+	clk_register_clkdev(clk[ccap1_eclk_div], "ccap1_eclk_div", NULL);
+	clk_register_clkdev(clk[ccap1_eclk_gate], "ccap1_eclk", NULL);
 
-	clk_register_clkdev(clk[cap0_aplldiv], "cap0_aplldiv", NULL);
-	clk_register_clkdev(clk[cap0_uplldiv], "cap0_uplldiv", NULL);
-	clk_register_clkdev(clk[cap0_eclk_mux], "cap0_eclk_mux", NULL);
-	clk_register_clkdev(clk[cap0_eclk_div], "cap0_eclk_div", NULL);
-	clk_register_clkdev(clk[cap0_eclk_gate], "cap0_eclk", NULL);
+	clk_register_clkdev(clk[ccap0_aplldiv], "ccap0_aplldiv", NULL);
+	clk_register_clkdev(clk[ccap0_uplldiv], "ccap0_uplldiv", NULL);
+	clk_register_clkdev(clk[ccap0_eclk_mux], "ccap0_eclk_mux", NULL);
+	clk_register_clkdev(clk[ccap0_eclk_div], "ccap0_eclk_div", NULL);
+	clk_register_clkdev(clk[ccap0_eclk_gate], "ccap0_eclk", NULL);
 
 	clk_register_clkdev(clk[uart0_eclk_mux], "uart0_eclk_mux", NULL);
 	clk_register_clkdev(clk[uart0_eclk_div], "uart0_eclk_div", NULL);

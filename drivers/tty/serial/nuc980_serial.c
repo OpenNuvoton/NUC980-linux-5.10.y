@@ -363,7 +363,7 @@ static void nuc980_prepare_RX_dma(struct uart_nuc980_port *p)
 #ifndef USING_SRAM
 		//p->dest_mem_p.size = 256;
 		p->dest_mem_p.size = 4096*2;
-		p->dest_mem_p.vir_addr = (u64)(kmalloc((UART_RX_BUF_SIZE * 2), GFP_KERNEL));
+		p->dest_mem_p.vir_addr = (unsigned int)kmalloc((UART_RX_BUF_SIZE * 2), GFP_KERNEL);
 		p->dest_mem_p.phy_addr = dma_map_single(pdma_rx->chan_rx->device->dev, (void *)p->dest_mem_p.vir_addr, (UART_RX_BUF_SIZE * 2), DMA_FROM_DEVICE);
                 ret = dma_mapping_error(pdma_rx->chan_rx->device->dev, p->dest_mem_p.phy_addr);
                 if (ret)
@@ -425,7 +425,7 @@ static void nuc980_prepare_TX_dma(struct uart_nuc980_port *p)
 
 	if(p->src_mem_p.size == 0) {
 		p->src_mem_p.size = UART_XMIT_SIZE;
-		p->src_mem_p.vir_addr = (u64)(kmalloc(p->src_mem_p.size, GFP_KERNEL));
+		p->src_mem_p.vir_addr = (unsigned int)kmalloc(p->src_mem_p.size, GFP_KERNEL);
 		p->src_mem_p.phy_addr = dma_map_single(pdma_tx->chan_tx->device->dev, (void *)p->src_mem_p.vir_addr, p->src_mem_p.size, DMA_TO_DEVICE);
                 ret = dma_mapping_error(pdma_tx->chan_tx->device->dev, p->src_mem_p.phy_addr);
                 if (ret)
@@ -517,20 +517,12 @@ static void rs485_stop_rx(struct uart_nuc980_port *port)
 static inline void __stop_tx(struct uart_nuc980_port *p)
 {
 	unsigned int ier;
-	struct tty_struct *tty = p->port.state->port.tty;
 
 	if ((ier = serial_in(p, UART_REG_IER)) & THRE_IEN) {
 		serial_out(p, UART_REG_IER, ier & ~THRE_IEN);
 	}
 	if (p->rs485.flags & SER_RS485_ENABLED)
 		rs485_start_rx(p);
-
-	if (tty->termios.c_line == N_IRDA) {
-		while(!(serial_in(p, UART_REG_FSR) & TX_EMPTY));
-		while(!(serial_in(p, UART_REG_FSR) & TE_FLAG));
-
-		serial_out(p, UART_REG_IRCR, (serial_in(p, UART_REG_IRCR) & ~0x2) ); // Tx disable (select Rx)
-	}
 
 }
 
@@ -547,14 +539,9 @@ static void nuc980serial_start_tx(struct uart_port *port)
 {
 	struct uart_nuc980_port *up = (struct uart_nuc980_port *)port;
 	unsigned int ier;
-	struct tty_struct *tty = up->port.state->port.tty;
 #if defined(CONFIG_ENABLE_UART_PDMA) || defined(CONFIG_USE_OF)
 	struct circ_buf *xmit = &up->port.state->xmit;
 #endif
-
-	if (tty->termios.c_line == N_IRDA) {
-		serial_out(up, UART_REG_IRCR, (serial_in(up, UART_REG_IRCR) | 0x2) ); // Tx enable
-	}
 
 	if (up->rs485.flags & SER_RS485_ENABLED)
 		rs485_stop_rx(up);
@@ -930,8 +917,6 @@ static int nuc980serial_startup(struct uart_port *port)
 		serial_out(up, UART_REG_IER, RTO_IEN | RDA_IEN | TIME_OUT_EN | BUFERR_IEN);
 	//serial_out(up, UART_REG_IER, RTO_IEN | RDA_IEN | TIME_OUT_EN);
 
-	/* 12MHz reference clock input, 115200 */
-	serial_out(up, UART_REG_BAUD, 0x30000066);
 
 #if defined(CONFIG_ENABLE_UART_PDMA) || defined(CONFIG_USE_OF)
 	if(up->uart_pdma_enable_flag == 1) {
@@ -1090,34 +1075,6 @@ nuc980serial_set_termios(struct uart_port *port, struct ktermios *termios, struc
 }
 
 static void
-nuc980serial_set_ldisc(struct uart_port *port, struct ktermios *termios)
-{
-	struct uart_nuc980_port *uart = (struct uart_nuc980_port *)port;
-	unsigned int baud;
-
-	switch (termios->c_line) {
-	case N_IRDA:
-
-		baud = serial_in(uart, UART_REG_BAUD);
-		baud = baud & (0x0000ffff);
-		baud = baud + 2;
-		baud = baud / 16;
-		baud = baud - 2;
-
-		serial_out(uart, UART_REG_BAUD, baud);
-		serial_out(uart, UART_REG_IRCR, (serial_in(uart, UART_REG_IRCR) & ~0x40) );  // Rx inverse
-
-		serial_out(uart, UART_FUN_SEL, (serial_in(uart, UART_FUN_SEL) & ~FUN_SEL_Msk) );
-		serial_out(uart, UART_FUN_SEL, (serial_in(uart, UART_FUN_SEL) | FUN_SEL_IrDA) );
-
-		break;
-	default:
-		serial_out(uart, UART_FUN_SEL, (serial_in(uart, UART_FUN_SEL) & ~FUN_SEL_Msk) );
-	}
-
-}
-
-static void
 nuc980serial_pm(struct uart_port *port, unsigned int state, unsigned int oldstate)
 {
 	struct uart_nuc980_port *p = (struct uart_nuc980_port *)port;
@@ -1220,7 +1177,6 @@ static struct uart_ops nuc980serial_ops = {
 	.startup     = nuc980serial_startup,
 	.shutdown    = nuc980serial_shutdown,
 	.set_termios = nuc980serial_set_termios,
-	.set_ldisc   = nuc980serial_set_ldisc,
 	.pm          = nuc980serial_pm,
 	.type        = nuc980serial_type,
 	.release_port= nuc980serial_release_port,
@@ -1256,7 +1212,8 @@ static void __init nuc980serial_init_ports(void)
 		up->port.iobase = (long)(NUC980_VA_UART0 + (i*0x1000));
 		up->port.membase = NUC980_VA_UART0 + (i*0x1000);
 		up->port.uartclk = 12000000;
-
+		/* 12MHz reference clock input, 115200 */
+		serial_out(up, UART_REG_BAUD, 0x30000066);
 	}
 }
 
@@ -1587,7 +1544,6 @@ void nuc980serial_set_clock(struct uart_nuc980_port *up)
 
 		clk = clk_get(NULL, "uart1_eclk_div");
 
-		//clk_set_rate(clk, 100000000);
 		clk_set_rate(clk, 150000000);
 		up->port.uartclk = clk_get_rate(clk);
 	}
@@ -1609,7 +1565,6 @@ void nuc980serial_set_clock(struct uart_nuc980_port *up)
 
 		clk = clk_get(NULL, "uart2_eclk_div");
 
-		//clk_set_rate(clk, 100000000);
 		clk_set_rate(clk, 150000000);
 		up->port.uartclk = clk_get_rate(clk);
 	}
@@ -1631,7 +1586,6 @@ void nuc980serial_set_clock(struct uart_nuc980_port *up)
 
 		clk = clk_get(NULL, "uart3_eclk_div");
 
-		//clk_set_rate(clk, 100000000);
 		clk_set_rate(clk, 150000000);
 		up->port.uartclk = clk_get_rate(clk);
 	}
@@ -1653,7 +1607,6 @@ void nuc980serial_set_clock(struct uart_nuc980_port *up)
 
 		clk = clk_get(NULL, "uart4_eclk_div");
 
-		//clk_set_rate(clk, 100000000);
 		clk_set_rate(clk, 150000000);
 		up->port.uartclk = clk_get_rate(clk);
 	}
@@ -1675,7 +1628,6 @@ void nuc980serial_set_clock(struct uart_nuc980_port *up)
 
 		clk = clk_get(NULL, "uart5_eclk_div");
 
-		//clk_set_rate(clk, 100000000);
 		clk_set_rate(clk, 150000000);
 		up->port.uartclk = clk_get_rate(clk);
 	}
@@ -1697,7 +1649,6 @@ void nuc980serial_set_clock(struct uart_nuc980_port *up)
 
 		clk = clk_get(NULL, "uart6_eclk_div");
 
-		//clk_set_rate(clk, 100000000);
 		clk_set_rate(clk, 150000000);
 		up->port.uartclk = clk_get_rate(clk);
 	}
@@ -1741,7 +1692,6 @@ void nuc980serial_set_clock(struct uart_nuc980_port *up)
 
 		clk = clk_get(NULL, "uart8_eclk_div");
 
-		//clk_set_rate(clk, 100000000);
 		clk_set_rate(clk, 150000000);
 		up->port.uartclk = clk_get_rate(clk);
 	}
@@ -1763,7 +1713,6 @@ void nuc980serial_set_clock(struct uart_nuc980_port *up)
 
 		clk = clk_get(NULL, "uart9_eclk_div");
 
-		//clk_set_rate(clk, 100000000);
 		clk_set_rate(clk, 150000000);
 		up->port.uartclk = clk_get_rate(clk);
 	}
@@ -2036,9 +1985,7 @@ static int __init nuc980serial_init(void)
 	ret = uart_register_driver(&nuc980serial_reg);
 	if (ret)
 		return ret;
-#ifndef CONFIG_SERIAL_NUC980_CONSOLE
-	nuc980serial_init_ports();
-#endif
+
 	ret = platform_driver_register(&nuc980serial_driver);
 	if (ret)
 		uart_unregister_driver(&nuc980serial_reg);

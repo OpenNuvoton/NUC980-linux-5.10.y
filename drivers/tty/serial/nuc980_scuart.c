@@ -35,6 +35,7 @@
 #include <linux/uaccess.h>
 #include <linux/of.h>
 #include <linux/of_device.h>
+#include <linux/pinctrl/consumer.h>
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/serial.h>
@@ -647,7 +648,8 @@ static int nuc980serial_probe(struct platform_device *pdev)
 #endif
 	up->port.dev 		= &pdev->dev;
 
-	up->port.flags 		= ASYNC_BOOT_AUTOCONF;
+	//up->port.flags 		= ASYNC_BOOT_AUTOCONF;
+	up->port.flags 		= UPF_BOOT_AUTOCONF;
 	up->port.ops = &nuc980serial_ops;
 
 	spin_lock_init(&up->port.lock);

@@ -19,12 +19,12 @@
 #include <linux/of.h>
 #include <linux/io.h>
 #include <linux/pwm.h>
-
+#include <linux/pinctrl/consumer.h>
 #include <mach/map.h>
 #include <mach/regs-pwm1.h>
 #include <mach/regs-clock.h>
 
-//#define DEBIG_PWM
+//#define DEBUG_PWM
 
 struct nuc980_chip {
 	struct platform_device	*pdev;
@@ -58,24 +58,28 @@ static void pwm_dbg(void)
 static int nuc980_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
 {
 	//struct nuc980_chip *nuc980 = to_nuc980_chip(chip);
-	int ch = pwm->hwpwm + chip->base;
+	int ch = pwm->hwpwm;
 	unsigned long flags, cnr, cmr;
+
+#ifdef DEBUG_PWM
+	printk("Enter %s ....ch[%d]\n",__FUNCTION__,pwm->hwpwm);
+#endif
 
 	local_irq_save(flags);
 
-	if(ch == 4) {
+	if(ch == 0) {
 		cnr = __raw_readl(REG_PWM_CNR0);
 		cmr = __raw_readl(REG_PWM_CMR0);
 		__raw_writel(__raw_readl(REG_PWM_PCR) | (9), REG_PWM_PCR);
 		__raw_writel(cnr, REG_PWM_CNR0);
 		__raw_writel(cmr, REG_PWM_CMR0);
-	} else if(ch == 5) {
+	} else if(ch == 1) {
 		cnr = __raw_readl(REG_PWM_CNR1);
 		cmr = __raw_readl(REG_PWM_CMR1);
 		__raw_writel(__raw_readl(REG_PWM_PCR) | (9 << 8), REG_PWM_PCR);
 		__raw_writel(cnr, REG_PWM_CNR1);
 		__raw_writel(cmr, REG_PWM_CMR1);
-	} else if (ch == 6) {
+	} else if (ch == 2) {
 		cnr = __raw_readl(REG_PWM_CNR2);
 		cmr = __raw_readl(REG_PWM_CMR2);
 		__raw_writel(__raw_readl(REG_PWM_PCR) | (9 << 12), REG_PWM_PCR);
@@ -99,15 +103,19 @@ static int nuc980_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
 static void nuc980_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
 {
 	//struct nuc980_chip *nuc980 = to_nuc980_chip(chip);
-	int ch = pwm->hwpwm + chip->base;
+	int ch = pwm->hwpwm;
 	unsigned long flags;
 
+#ifdef DEBUG_PWM
+	printk("Enter %s ....ch[%d]\n",__FUNCTION__,pwm->hwpwm);
+#endif
+
 	local_irq_save(flags);
-	if(ch == 4)
+	if(ch == 0)
 		__raw_writel(__raw_readl(REG_PWM_PCR) & ~(1), REG_PWM_PCR);
-	else if(ch == 5)
+	else if(ch == 1)
 		__raw_writel(__raw_readl(REG_PWM_PCR) & ~(1 << 8), REG_PWM_PCR);
-	else if (ch == 6)
+	else if (ch == 2)
 		__raw_writel(__raw_readl(REG_PWM_PCR) & ~(1 << 12), REG_PWM_PCR);
 	else	/* ch 3 */
 		__raw_writel(__raw_readl(REG_PWM_PCR) & ~(1 << 16), REG_PWM_PCR);
@@ -121,27 +129,31 @@ static void nuc980_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
 static int nuc980_pwm_set_polarity(struct pwm_chip *chip, struct pwm_device *pwm, enum pwm_polarity polarity)
 {
 	//struct nuc980_chip *nuc980 = to_nuc980_chip(chip);
-	int ch = pwm->hwpwm + chip->base;
+	int ch = pwm->hwpwm;
 	unsigned long flags;
+
+#ifdef DEBUG_PWM
+	printk("Enter %s ....ch[%d]\n",__FUNCTION__,pwm->hwpwm);
+#endif
 
 	local_irq_save(flags);
 
-	if(ch == 4) {
+	if(ch == 0) {
 		if (polarity == PWM_POLARITY_NORMAL)
 			__raw_writel(__raw_readl(REG_PWM_PCR) & ~(4), REG_PWM_PCR);
 		else
 			__raw_writel(__raw_readl(REG_PWM_PCR) | (4), REG_PWM_PCR);
-	} else if(ch == 5) {
+	} else if(ch == 1) {
 		if (polarity == PWM_POLARITY_NORMAL)
 			__raw_writel(__raw_readl(REG_PWM_PCR) & ~(4 << 8), REG_PWM_PCR);
 		else
 			__raw_writel(__raw_readl(REG_PWM_PCR) | (4 << 8), REG_PWM_PCR);
-	} else if (ch == 6) {
+	} else if (ch == 2) {
 		if (polarity == PWM_POLARITY_NORMAL)
 			__raw_writel(__raw_readl(REG_PWM_PCR) & ~(4 << 12), REG_PWM_PCR);
 		else
 			__raw_writel(__raw_readl(REG_PWM_PCR) | (4 << 12), REG_PWM_PCR);
-	} else {	/* ch 7 */
+	} else {	/* ch 3 */
 		if (polarity == PWM_POLARITY_NORMAL)
 			__raw_writel(__raw_readl(REG_PWM_PCR) & ~(4 << 16), REG_PWM_PCR);
 		else
@@ -162,7 +174,11 @@ static int nuc980_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
 	struct nuc980_chip *nuc980 = to_nuc980_chip(chip);
 	unsigned long period, duty, prescale;
 	unsigned long flags;
-	int ch = pwm->hwpwm + chip->base;
+	int ch = pwm->hwpwm;
+
+#ifdef DEBUG_PWM
+	printk("Enter %s ....ch[%d]\n",__FUNCTION__,pwm->hwpwm);
+#endif
 
 	// Get PCLK, calculate valid parameter range.
 	prescale = clk_get_rate(nuc980->clk) / 1000000 - 1;
@@ -181,13 +197,13 @@ static int nuc980_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
 	// Set prescale for all pwm channels
 	__raw_writel(prescale | (prescale << 8), REG_PWM_PPR);
 
-	if(ch == 4) {
+	if(ch == 0) {
 		__raw_writel(period - 1, REG_PWM_CNR0);
 		__raw_writel(duty - 1, REG_PWM_CMR0);
-	} else if(ch == 5) {
+	} else if(ch == 1) {
 		__raw_writel(period - 1, REG_PWM_CNR1);
 		__raw_writel(duty - 1, REG_PWM_CMR1);
-	} else if (ch == 6) {
+	} else if (ch == 2) {
 		__raw_writel(period - 1, REG_PWM_CNR2);
 		__raw_writel(duty - 1, REG_PWM_CMR2);
 	} else {/* ch 3 */
@@ -231,10 +247,8 @@ static int nuc980_pwm_probe(struct platform_device *pdev)
 
 	nuc980->chip.dev = &pdev->dev;
 	nuc980->chip.ops = &nuc980_pwm_ops;
-	//nuc980->chip.of_xlate = of_pwm_xlate_with_flags;
-	//nuc980->chip.of_pwm_n_cells = 3;
 	nuc980->chip.base = pdev->id;
-	nuc980->chip.npwm = 1;
+	nuc980->chip.npwm = 4;
 
 	nuc980->clk = clk_get(NULL, "pwm1");
 	if (IS_ERR(nuc980->clk)) {
