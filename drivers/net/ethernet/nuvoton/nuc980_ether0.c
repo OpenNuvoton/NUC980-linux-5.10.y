@@ -37,8 +37,8 @@
 /* Ethernet MAC0 Registers */
 #define REG_CAMCMR		(void __iomem *)0xF0012000
 #define REG_CAMEN		(void __iomem *)0xF0012004
-#define REG_CAMM_BASE		(void __iomem *)0xF0012008
-#define REG_CAML_BASE		(void __iomem *)0xF001200c
+#define REG_CAMM_BASE	(void __iomem *)0xF0012008
+#define REG_CAML_BASE	(void __iomem *)0xF001200c
 #define REG_TXDLSA		(void __iomem *)0xF0012088
 #define REG_RXDLSA		(void __iomem *)0xF001208C
 #define REG_MCMDR		(void __iomem *)0xF0012090
@@ -57,13 +57,15 @@
 
 /* mac controller bit */
 #define MCMDR_RXON		0x01
+#define MCMDR_ALP		(0x01 << 1)
+#define MCMDR_ARP		(0x01 << 2)
 #define MCMDR_ACP		(0x01 << 3)
 #define MCMDR_SPCRC		(0x01 << 5)
-#define MCMDR_MGPWAKE		(0x01 << 6)
+#define MCMDR_MGPWAKE	(0x01 << 6)
 #define MCMDR_TXON		(0x01 << 8)
 #define MCMDR_FDUP		(0x01 << 18)
 #define MCMDR_OPMOD		(0x01 << 20)
-#define SWR			(0x01 << 24)
+#define SWR				(0x01 << 24)
 
 /* cam command register */
 #define CAMCMR_AUP		0x01
@@ -78,7 +80,7 @@
 //#define PHYAD			(0x01 << 8)
 #define PHYWR			(0x01 << 16)
 #define PHYBUSY			(0x01 << 17)
-#define CAM_ENTRY_SIZE		0x08
+#define CAM_ENTRY_SIZE	0x08
 
 /* rx and tx status */
 #define TXDS_TXCP		(0x01 << 19)
@@ -90,10 +92,10 @@
 
 /* mac interrupt status*/
 #define MISTA_EXDEF		(0x01 << 19)
-#define MISTA_TXBERR		(0x01 << 24)
+#define MISTA_TXBERR	(0x01 << 24)
 #define MISTA_TDU		(0x01 << 23)
 #define MISTA_RDU		(0x01 << 10)
-#define MISTA_RXBERR		(0x01 << 11)
+#define MISTA_RXBERR	(0x01 << 11)
 #define MISTA_WOL		(0x01 << 15)
 #define MISTA_RXGD		(0x01 << 4)
 #define MISTA_TXEMP		(0x01 << 17)
@@ -308,7 +310,7 @@ static void nuc980_write_cam(struct net_device *dev,
 
 static struct sk_buff * get_new_skb(struct net_device *dev, u32 i) {
 	struct nuc980_ether *ether = netdev_priv(dev);
-	struct sk_buff *skb = dev_alloc_skb(1520);
+	struct sk_buff *skb = dev_alloc_skb(2048);
 
 	if (skb == NULL)
 		return NULL;
@@ -317,7 +319,7 @@ static struct sk_buff * get_new_skb(struct net_device *dev, u32 i) {
 	skb->dev = dev;
 
 	(ether->rdesc + i)->buffer = dma_map_single(&ether->pdev->dev, skb->data,
-							1520, DMA_FROM_DEVICE);
+							2048, DMA_FROM_DEVICE);
 	rx_skb[i] = skb;
 
 	return skb;
@@ -399,7 +401,7 @@ static int nuc980_init_desc(struct net_device *dev)
 
 			for(; i != 0; i--) {
 				dma_unmap_single(&dev->dev, (dma_addr_t)((ether->rdesc + i)->buffer),
-							1520, DMA_FROM_DEVICE);
+							2048, DMA_FROM_DEVICE);
 				dev_kfree_skb_any(rx_skb[i]);
 			}
 			return -ENOMEM;
@@ -430,7 +432,7 @@ static void nuc980_free_desc(struct net_device *dev)
 	for (i = 0; i < RX_DESC_SIZE; i++) {
 		skb = rx_skb[i];
 		if(skb != NULL) {
-			dma_unmap_single(&dev->dev, (dma_addr_t)((ether->rdesc + i)->buffer), 1520, DMA_FROM_DEVICE);
+			dma_unmap_single(&dev->dev, (dma_addr_t)((ether->rdesc + i)->buffer), 2048, DMA_FROM_DEVICE);
 			dev_kfree_skb_any(skb);
 		}
 	}
@@ -482,9 +484,8 @@ static void nuc980_set_global_maccmd(struct net_device *dev)
 	unsigned int val;
 
 	val = __raw_readl( REG_MCMDR);
-	val |= MCMDR_SPCRC | MCMDR_ACP;
+	val |= MCMDR_ALP | MCMDR_SPCRC | MCMDR_ACP;
 	__raw_writel(val,  REG_MCMDR);
-	__raw_writel(1518,  REG_DMARFC);
 }
 
 static void nuc980_enable_cam(struct net_device *dev)
@@ -514,6 +515,25 @@ static void nuc980_set_curdest(struct net_device *dev)
 	__raw_writel(ether->start_rx_ptr,  REG_RXDLSA);
 	__raw_writel(ether->start_tx_ptr,  REG_TXDLSA);
 }
+
+static void nuc980_enable_alp(struct net_device *dev)
+{
+	unsigned int val;
+
+	val = __raw_readl(REG_MCMDR);
+	val |= MCMDR_ALP;
+	__raw_writel(val, REG_MCMDR);
+}
+#if 0
+static void nuc980_enable_arp(struct net_device *dev)
+{
+	unsigned int val;
+
+	val = __raw_readl(REG_MCMDR);
+	val |= MCMDR_ARP;
+	__raw_writel(val, REG_MCMDR);
+}
+#endif
 
 static void nuc980_reset_mac(struct net_device *dev)
 {
@@ -650,7 +670,7 @@ static int nuc980_ether_start_xmit(struct sk_buff *skb, struct net_device *dev)
 					skb->len, DMA_TO_DEVICE);
 
 //	tx_skb[ether->cur_tx]  = skb;
-	txbd->sl = skb->len > 1514 ? 1514 : skb->len;
+	txbd->sl = skb->len;
 	wmb();	// This is dummy function for ARM9
 	txbd->mode |= TX_OWEN_DMA;
 	wmb();	// This is dummy function for ARM9
@@ -737,16 +757,16 @@ static int nuc980_poll(struct napi_struct *napi, int budget)
 		status = rxbd->sl;
 		length = status & 0xFFFF;
 
-		if (likely((status & RXDS_RXGD) && (length <= 1514))) {
+		if (likely(status & RXDS_RXGD)) {
 
-			skb = dev_alloc_skb(1520);
+			skb = dev_alloc_skb(2048);
 			if (!skb) {
 				struct platform_device *pdev = ether->pdev;
 				dev_err(&pdev->dev, "get skb buffer error\n");
 				ether->stats.rx_dropped++;
 				goto rx_out;
 			}
-			dma_unmap_single(&dev->dev, (dma_addr_t)rxbd->buffer, 1520, DMA_FROM_DEVICE);
+			dma_unmap_single(&dev->dev, (dma_addr_t)rxbd->buffer, 2048, DMA_FROM_DEVICE);
 
 			skb_put(s, length);
 			s->protocol = eth_type_trans(s, dev);
@@ -757,7 +777,7 @@ static int nuc980_poll(struct napi_struct *napi, int budget)
 			skb->dev = dev;
 
 			rxbd->buffer = dma_map_single(&ether->pdev->dev, skb->data,
-							1520, DMA_FROM_DEVICE);
+							2048, DMA_FROM_DEVICE);
 
 			rx_skb[ether->cur_rx] = skb;
 			rx_cnt++;
@@ -957,21 +977,25 @@ static int nuc980_get_ts_info(struct net_device *dev, struct ethtool_ts_info *in
 	return 0;
 }
 
-/* Just update variable, support in future */
 static int nuc980_change_mtu(struct net_device *dev, int new_mtu)
 {
-	//struct nuc980_ether *ether = netdev_priv(dev);
-	if(new_mtu < 0)
+	unsigned int val;
+
+	if(new_mtu < 64 || new_mtu > 2048)
 		return -EINVAL;
-	else if(!netif_running(dev)) {
-		dev->mtu = new_mtu;
-		return 0;
+
+	if(new_mtu < 1500)
+	{
+		val = __raw_readl(REG_MCMDR);
+		val &= ~(MCMDR_ALP | MCMDR_ARP);
+		__raw_writel(val, REG_MCMDR);
 	}
-	else {
-		nuc980_ether_close(dev);
-		dev->mtu = new_mtu;
-		return nuc980_ether_open(dev);
-	}
+	else
+		nuc980_enable_alp(dev);
+
+	dev->mtu = new_mtu;
+
+	return 0;
 }
 
 static const struct ethtool_ops nuc980_ether_ethtool_ops = {
