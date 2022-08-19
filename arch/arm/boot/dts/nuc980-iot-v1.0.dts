@@ -11,7 +11,7 @@
  * http://www.gnu.org/copyleft/gpl.html
  */
 /dts-v1/;
-/include/ "nuc980.dtsi"
+#include "nuc980.dtsi"
 
 / {
 	model = "Nuvoton NUC980 IOT V1.0";
@@ -92,11 +92,11 @@
 			status = "disabled";
 		};
 
-		pwm0: pwm0@b0058000 {
+		pwm0: pwm@b0058000 {
 			status = "disabled";
 		};
 
-		pwm1: pwm1@b0059000 {
+		pwm1: pwm@b0059000 {
 			status = "disabled";
 		};
 		pinctrl: pinctrl@b0000000 {
@@ -113,7 +113,7 @@
 				};
 			};
 		};
-		qspi0: qspi0@b0060000 {
+		qspi0: spi@b0060000 {
 			status = "okay";
 			#address-cells = <1>;
 			#size-cells = <0>;
@@ -130,7 +130,7 @@
 			txbitlen = <8>;
 			bus_num	= <0>;
 
-			flash: mt29f@0 {
+			flash: flash@0 {
 				compatible = "spinand,mt29f";
 				#address-cells = <1>;
 				#size-cells = <1>;
@@ -153,7 +153,7 @@
 			};
 		};
 
-		spi0: spi0@b0061000 {
+		spi0: spi@b0061000 {
 			status = "okay";
 			#address-cells = <1>;
 			#size-cells = <0>;
@@ -171,7 +171,7 @@
 
 		};
 
-		spi1: spi1@b0062000 {
+		spi1: spi@b0062000 {
 			status = "disabled";
 			#address-cells = <1>;
 			#size-cells = <0>;
