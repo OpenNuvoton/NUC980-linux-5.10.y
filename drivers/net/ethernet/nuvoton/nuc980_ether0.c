@@ -19,6 +19,9 @@
 #include <linux/platform_device.h>
 #include <linux/clk.h>
 #include <linux/of.h>
+#include <linux/of_net.h>
+#include <linux/of_device.h>
+#include <linux/of_mdio.h>
 #include <linux/gfp.h>
 #include <linux/kthread.h>
 #include <linux/interrupt.h>
@@ -26,6 +29,8 @@
 #include <linux/ctype.h>
 #include <linux/net_tstamp.h>
 #include <linux/pinctrl/consumer.h>
+#include <net/ncsi.h>
+
 
 #include <mach/map.h>
 #include <mach/regs-clock.h>
@@ -60,12 +65,13 @@
 #define MCMDR_ALP		(0x01 << 1)
 #define MCMDR_ARP		(0x01 << 2)
 #define MCMDR_ACP		(0x01 << 3)
+#define MCMDR_AEP		(0x01 << 4)
 #define MCMDR_SPCRC		(0x01 << 5)
-#define MCMDR_MGPWAKE	(0x01 << 6)
+#define MCMDR_MGPWAKE		(0x01 << 6)
 #define MCMDR_TXON		(0x01 << 8)
 #define MCMDR_FDUP		(0x01 << 18)
 #define MCMDR_OPMOD		(0x01 << 20)
-#define SWR				(0x01 << 24)
+#define SWR			(0x01 << 24)
 
 /* cam command register */
 #define CAMCMR_AUP		0x01
@@ -80,7 +86,7 @@
 //#define PHYAD			(0x01 << 8)
 #define PHYWR			(0x01 << 16)
 #define PHYBUSY			(0x01 << 17)
-#define CAM_ENTRY_SIZE	0x08
+#define CAM_ENTRY_SIZE		0x08
 
 /* rx and tx status */
 #define TXDS_TXCP		(0x01 << 19)
@@ -92,10 +98,10 @@
 
 /* mac interrupt status*/
 #define MISTA_EXDEF		(0x01 << 19)
-#define MISTA_TXBERR	(0x01 << 24)
+#define MISTA_TXBERR		(0x01 << 24)
 #define MISTA_TDU		(0x01 << 23)
 #define MISTA_RDU		(0x01 << 10)
-#define MISTA_RXBERR	(0x01 << 11)
+#define MISTA_RXBERR		(0x01 << 11)
 #define MISTA_WOL		(0x01 << 15)
 #define MISTA_RXGD		(0x01 << 4)
 #define MISTA_TXEMP		(0x01 << 17)
@@ -103,6 +109,7 @@
 
 #define ENSTART			0x01
 #define ENRXINTR		0x01
+#define ENCRCE			(0x01 << 1)
 #define ENRXGD			(0x01 << 4)
 #define ENRDU			(0x01 << 10)
 #define ENRXBERR		(0x01 << 11)
@@ -137,8 +144,18 @@
 #define TX_TIMEOUT	50
 #define DELAY		1000
 #define CAM0		0x0
-
 #define MII_TIMEOUT	100
+
+#ifdef CONFIG_VLAN_8021Q
+#define IS_VLAN 1
+#else
+#define IS_VLAN 0
+#endif
+
+#define NCSI_DEBUG 0
+
+// (ETH_FRAME_LEN + (IS_VLAN * VLAN_HLEN) + ETH_FCS_LEN + Align Size) < 0x600
+#define MAX_PACKET_SIZE           1536
 
 #define ETH_TRIGGER_RX	do{__raw_writel(ENSTART, REG_RSDR);}while(0)
 #define ETH_TRIGGER_TX	do{__raw_writel(ENSTART, REG_TSDR);}while(0)
@@ -174,10 +191,12 @@ struct  nuc980_ether {
 	dma_addr_t tdesc_phys;
 	struct net_device_stats stats;
 	struct platform_device *pdev;
-	struct net_device *ndev;
+	struct net_device *netdev;
+	struct ncsi_dev *ncsidev; /* Sideband interface */
 	struct resource *res;
 	struct clk *clk;
 	struct clk *eclk;
+	struct device_node *phy_dn;
 	unsigned int msg_enable;
 	struct mii_bus *mii_bus;
 	struct phy_device *phy_dev;
@@ -192,6 +211,7 @@ struct  nuc980_ether {
 	int link;
 	int speed;
 	int duplex;
+	bool use_ncsi;
 	int wol;
 };
 
@@ -238,17 +258,39 @@ err:
 }
 early_param("ethaddr0", setup_macaddr);
 
-static void adjust_link(struct net_device *dev)
+
+static void nuc980_opmode(struct net_device *netdev, int speed, int duplex)
 {
-	struct nuc980_ether *ether = netdev_priv(dev);
+        u32 val;
+
+        val = __raw_readl(REG_MCMDR);
+
+        if (speed == SPEED_100)
+                val |= MCMDR_OPMOD;
+        else
+                val &= ~MCMDR_OPMOD;
+
+        if (duplex == DUPLEX_FULL)
+                val |= MCMDR_FDUP;
+        else
+                val &= ~MCMDR_FDUP;
+
+        __raw_writel(val, REG_MCMDR);
+
+        ETH_TRIGGER_TX; // in case some packets queued in descriptor
+}
+
+static void adjust_link(struct net_device *netdev)
+{
+	struct nuc980_ether *ether = netdev_priv(netdev);
 	struct phy_device *phydev = ether->phy_dev;
-	unsigned int val;
 	bool status_change = false;
 	unsigned long flags;
 
 	spin_lock_irqsave(&ether->lock, flags);
 
 	if (phydev->link) {
+
 		if ((ether->speed != phydev->speed) ||
 		    (ether->duplex != phydev->duplex)) {
 			ether->speed = phydev->speed;
@@ -256,8 +298,7 @@ static void adjust_link(struct net_device *dev)
 			status_change = true;
 		}
 	} else {
-		// disable tx/rx
-		__raw_writel(__raw_readl( REG_MCMDR) & ~(MCMDR_RXON | MCMDR_TXON), REG_MCMDR);
+
 		ether->speed = 0;
 		ether->duplex = -1;
 	}
@@ -273,28 +314,13 @@ static void adjust_link(struct net_device *dev)
 
 	if (status_change) {
 
-		val = __raw_readl( REG_MCMDR) | MCMDR_RXON | MCMDR_TXON;
-
-		if (ether->speed == 100) {
-			val |= MCMDR_OPMOD;
-		} else {
-			val &= ~MCMDR_OPMOD;
-		}
-
-		if(ether->duplex == DUPLEX_FULL) {
-			val |= MCMDR_FDUP;
-		} else {
-			val &= ~MCMDR_FDUP;
-		}
-
-		__raw_writel(val,  REG_MCMDR);
-		ETH_TRIGGER_TX; // in case some packets queued in descriptor
+		nuc980_opmode(netdev, ether->speed, ether->duplex);
 	}
 }
 
 
 
-static void nuc980_write_cam(struct net_device *dev,
+static void nuc980_write_cam(struct net_device *netdev,
 				unsigned int x, unsigned char *pval)
 {
 	unsigned int msw, lsw;
@@ -308,24 +334,24 @@ static void nuc980_write_cam(struct net_device *dev,
 }
 
 
-static struct sk_buff * get_new_skb(struct net_device *dev, u32 i) {
-	struct nuc980_ether *ether = netdev_priv(dev);
-	struct sk_buff *skb = dev_alloc_skb(2048);
+static struct sk_buff * get_new_skb(struct net_device *netdev, u32 i) {
+	struct nuc980_ether *ether = netdev_priv(netdev);
+	struct sk_buff *skb = dev_alloc_skb(MAX_PACKET_SIZE);
 
 	if (skb == NULL)
 		return NULL;
 
 	skb_reserve(skb, 2);
-	skb->dev = dev;
+	skb->dev = netdev;
 
 	(ether->rdesc + i)->buffer = dma_map_single(&ether->pdev->dev, skb->data,
-							2048, DMA_FROM_DEVICE);
+							MAX_PACKET_SIZE, DMA_FROM_DEVICE);
 	rx_skb[i] = skb;
 
 	return skb;
 }
 
-static int nuc980_init_desc(struct net_device *dev)
+static int nuc980_init_desc(struct net_device *netdev)
 {
 	struct nuc980_ether *ether;
 	struct nuc980_txbd  *tdesc;
@@ -333,7 +359,7 @@ static int nuc980_init_desc(struct net_device *dev)
 	struct platform_device *pdev;
 	unsigned int i, ret;
 
-	ether = netdev_priv(dev);
+	ether = netdev_priv(netdev);
 	pdev = ether->pdev;
 
 	ret = dma_coerce_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
@@ -393,15 +419,15 @@ static int nuc980_init_desc(struct net_device *dev)
 
 		rdesc->next = ether->rdesc_phys + offset;
 		rdesc->sl = RX_OWEN_DMA;
-		if(get_new_skb(dev, i) == NULL) {
+		if(get_new_skb(netdev, i) == NULL) {
 			dma_free_coherent(&pdev->dev, sizeof(struct nuc980_txbd) * TX_DESC_SIZE,
 						ether->tdesc, ether->tdesc_phys);
 			dma_free_coherent(&pdev->dev, sizeof(struct nuc980_rxbd) * RX_DESC_SIZE,
 						ether->rdesc, ether->rdesc_phys);
 
 			for(; i != 0; i--) {
-				dma_unmap_single(&dev->dev, (dma_addr_t)((ether->rdesc + i)->buffer),
-							2048, DMA_FROM_DEVICE);
+				dma_unmap_single(&netdev->dev, (dma_addr_t)((ether->rdesc + i)->buffer),
+							MAX_PACKET_SIZE, DMA_FROM_DEVICE);
 				dev_kfree_skb_any(rx_skb[i]);
 			}
 			return -ENOMEM;
@@ -414,17 +440,17 @@ static int nuc980_init_desc(struct net_device *dev)
 }
 
 // This API must call with Tx/Rx stopped
-static void nuc980_free_desc(struct net_device *dev)
+static void nuc980_free_desc(struct net_device *netdev)
 {
 	struct sk_buff *skb;
 	u32 i;
-	struct nuc980_ether *ether = netdev_priv(dev);
+	struct nuc980_ether *ether = netdev_priv(netdev);
 	struct platform_device *pdev = ether->pdev;
 
 	for (i = 0; i < TX_DESC_SIZE; i++) {
 		skb = tx_skb[i];
 		if(skb != NULL) {
-			dma_unmap_single(&dev->dev, (dma_addr_t)((ether->tdesc + i)->buffer), skb->len, DMA_TO_DEVICE);
+			dma_unmap_single(&netdev->dev, (dma_addr_t)((ether->tdesc + i)->buffer), skb->len, DMA_TO_DEVICE);
 			dev_kfree_skb_any(skb);
 		}
 	}
@@ -432,7 +458,7 @@ static void nuc980_free_desc(struct net_device *dev)
 	for (i = 0; i < RX_DESC_SIZE; i++) {
 		skb = rx_skb[i];
 		if(skb != NULL) {
-			dma_unmap_single(&dev->dev, (dma_addr_t)((ether->rdesc + i)->buffer), 2048, DMA_FROM_DEVICE);
+			dma_unmap_single(&netdev->dev, (dma_addr_t)((ether->rdesc + i)->buffer), MAX_PACKET_SIZE, DMA_FROM_DEVICE);
 			dev_kfree_skb_any(skb);
 		}
 	}
@@ -444,7 +470,7 @@ static void nuc980_free_desc(struct net_device *dev)
 
 }
 
-static void nuc980_set_fifo_threshold(struct net_device *dev)
+static void nuc980_set_fifo_threshold(struct net_device *netdev)
 {
 	unsigned int val;
 
@@ -452,7 +478,7 @@ static void nuc980_set_fifo_threshold(struct net_device *dev)
 	__raw_writel(val,  REG_FFTCR);
 }
 
-static void nuc980_return_default_idle(struct net_device *dev)
+static void nuc980_return_default_idle(struct net_device *netdev)
 {
 	unsigned int val;
 
@@ -462,44 +488,62 @@ static void nuc980_return_default_idle(struct net_device *dev)
 }
 
 
-static void nuc980_enable_mac_interrupt(struct net_device *dev)
+static void nuc980_enable_mac_interrupt(struct net_device *netdev)
 {
 	unsigned int val;
 
-	val = ENTXINTR | ENRXINTR | ENRXGD | ENTXCP | ENRDU;
-	val |= ENTXBERR | ENRXBERR | ENTXABT | ENWOL;
+	val =	ENRXINTR |   /* Receive Interrupt Enable Bit */
+//		ENCRCE   |   /* CRC Error Interrupt Enable Bit */
+		ENTXINTR |
+		ENRXGD   |
+		ENTXCP   |
+		ENRDU    |
+		ENTXBERR |
+		ENRXBERR |
+		ENTXABT  |
+		ENWOL;
 
 	__raw_writel(val,  REG_MIEN);
 }
 
-static void nuc980_get_and_clear_int(struct net_device *dev,
+static void nuc980_get_and_clear_int(struct net_device *netdev,
 							unsigned int *val, unsigned int mask)
 {
 	*val = __raw_readl( REG_MISTA) & mask;
 	__raw_writel(*val,  REG_MISTA);
 }
 
-static void nuc980_set_global_maccmd(struct net_device *dev)
+static void nuc980_set_global_maccmd(struct net_device *netdev)
 {
+        struct nuc980_ether *ether = netdev_priv(netdev);
 	unsigned int val;
 
-	val = __raw_readl( REG_MCMDR);
-	val |= MCMDR_ALP | MCMDR_SPCRC | MCMDR_ACP;
+	val = __raw_readl( REG_MCMDR) |
+		MCMDR_SPCRC |
+		MCMDR_ACP |
+		/* NC-SI RX packets cause CRC error. Here, accept them. */
+		(MCMDR_AEP * ether->use_ncsi);
+	if (IS_VLAN)
+        {
+		val |= MCMDR_ALP;
+	}
+        /* limit receive length to MAX_PACKET_SIZE bytes due to crazy RX-DMA. */
+	__raw_writel(MAX_PACKET_SIZE,  REG_DMARFC);
 	__raw_writel(val,  REG_MCMDR);
 }
 
-static void nuc980_enable_cam(struct net_device *dev)
+static void nuc980_enable_cam(struct net_device *netdev)
 {
 	unsigned int val;
 
-	nuc980_write_cam(dev, CAM0, dev->dev_addr);
+	nuc980_write_cam(netdev, CAM0, netdev->dev_addr);
 
 	val = __raw_readl( REG_CAMEN);
 	val |= CAM0EN;
 	__raw_writel(val,  REG_CAMEN);
 }
 
-static void nuc980_enable_cam_command(struct net_device *dev)
+static void nuc980_enable_cam_command(struct net_device *netdev)
 {
 	unsigned int val;
 
@@ -508,61 +552,61 @@ static void nuc980_enable_cam_command(struct net_device *dev)
 }
 
 
-static void nuc980_set_curdest(struct net_device *dev)
+static void nuc980_set_curdest(struct net_device *netdev)
 {
-	struct nuc980_ether *ether = netdev_priv(dev);
+	struct nuc980_ether *ether = netdev_priv(netdev);
 
 	__raw_writel(ether->start_rx_ptr,  REG_RXDLSA);
 	__raw_writel(ether->start_tx_ptr,  REG_TXDLSA);
 }
 
-static void nuc980_enable_alp(struct net_device *dev)
+static void nuc980_set_alp(struct net_device *dev, int bOn)
 {
 	unsigned int val;
 
 	val = __raw_readl(REG_MCMDR);
-	val |= MCMDR_ALP;
+	if (bOn)
+	{
+		val |= MCMDR_ALP;
+	}
+	else
+	{
+		val &= ~(MCMDR_ALP | MCMDR_ARP);
+	}
 	__raw_writel(val, REG_MCMDR);
 }
-#if 0
-static void nuc980_enable_arp(struct net_device *dev)
-{
-	unsigned int val;
 
-	val = __raw_readl(REG_MCMDR);
-	val |= MCMDR_ARP;
-	__raw_writel(val, REG_MCMDR);
-}
-#endif
-
-static void nuc980_reset_mac(struct net_device *dev)
+static void nuc980_reset_mac(struct net_device *netdev)
 {
-	struct nuc980_ether *ether = netdev_priv(dev);
+	struct nuc980_ether *ether = netdev_priv(netdev);
 
 	ETH_DISABLE_TX;
-	ETH_DISABLE_RX;;
+	ETH_DISABLE_RX;
 
-	nuc980_return_default_idle(dev);
-	nuc980_set_fifo_threshold(dev);
+	nuc980_return_default_idle(netdev);
+	nuc980_set_fifo_threshold(netdev);
 
-	if (!netif_queue_stopped(dev))
-		netif_stop_queue(dev);
+	if (!netif_queue_stopped(netdev))
+		netif_stop_queue(netdev);
 
-	nuc980_init_desc(dev);
+	nuc980_init_desc(netdev);
 
 	ether->cur_tx = 0x0;
 	ether->finish_tx = 0x0;
 	ether->cur_rx = 0x0;
 
-	nuc980_set_curdest(dev);
-	nuc980_enable_cam(dev);
-	nuc980_enable_cam_command(dev);
-	nuc980_enable_mac_interrupt(dev);
+	nuc980_set_curdest(netdev);
+	nuc980_enable_cam(netdev);
+	nuc980_enable_cam_command(netdev);
+	nuc980_enable_mac_interrupt(netdev);
+        nuc980_set_global_maccmd(netdev);
 
-	dev->_tx->trans_start = jiffies; /* prevent tx timeout */
+	netdev->_tx->trans_start = jiffies; /* prevent tx timeout */
 
-	if (netif_queue_stopped(dev))
-		netif_wake_queue(dev);
+        ETH_ENABLE_TX;
+
+	if (netif_queue_stopped(netdev))
+		netif_wake_queue(netdev);
 }
 
 static int nuc980_mdio_write(struct mii_bus *bus, int phy_id, int regnum,
@@ -609,68 +653,83 @@ static int nuc980_mdio_reset(struct mii_bus *bus)
 	return 0;
 }
 
-static int nuc980_set_mac_address(struct net_device *dev, void *addr)
+static int nuc980_set_mac_address(struct net_device *netdev, void *addr)
 {
 	struct sockaddr *address = addr;
 
 	if (!is_valid_ether_addr(address->sa_data))
 		return -EADDRNOTAVAIL;
 
-	memcpy(dev->dev_addr, address->sa_data, dev->addr_len);
-	nuc980_write_cam(dev, CAM0, dev->dev_addr);
+	memcpy(netdev->dev_addr, address->sa_data, netdev->addr_len);
+	nuc980_write_cam(netdev, CAM0, netdev->dev_addr);
 
 	return 0;
 }
 
-static int nuc980_ether_close(struct net_device *dev)
+static int nuc980_ether_close(struct net_device *netdev)
 {
-	struct nuc980_ether *ether = netdev_priv(dev);
+	struct nuc980_ether *ether = netdev_priv(netdev);
 	struct platform_device *pdev;
 
 	pdev = ether->pdev;
 
-	ETH_DISABLE_TX;
-	ETH_DISABLE_RX;
-	netif_stop_queue(dev);
-	napi_disable(&ether->napi);
-	free_irq(ether->txirq, dev);
-	free_irq(ether->rxirq, dev);
-
-	nuc980_return_default_idle(dev);
-	nuc980_free_desc(dev);
-
 	if (ether->phy_dev)
 		phy_stop(ether->phy_dev);
+	else if (ether->use_ncsi)
+		ncsi_stop_dev(ether->ncsidev);
+
+	ETH_DISABLE_TX;
+	ETH_DISABLE_RX;
+
+        nuc980_return_default_idle(netdev);
+
+	netif_stop_queue(netdev);
+	napi_disable(&ether->napi);
+
+	free_irq(ether->txirq, netdev);
+	free_irq(ether->rxirq, netdev);
+
+	nuc980_free_desc(netdev);
+
+        dev_info(&pdev->dev, "%s is closed\n", netdev->name);
 
 	return 0;
 }
 
-static struct net_device_stats *nuc980_ether_stats(struct net_device *dev)
+static struct net_device_stats *nuc980_ether_stats(struct net_device *netdev)
 {
 	struct nuc980_ether *ether;
 
-	ether = netdev_priv(dev);
+	ether = netdev_priv(netdev);
 
 	return &ether->stats;
 }
 
 
-static int nuc980_ether_start_xmit(struct sk_buff *skb, struct net_device *dev)
+static int nuc980_ether_start_xmit(struct sk_buff *skb, struct net_device *netdev)
 {
-	struct nuc980_ether *ether = netdev_priv(dev);
+	struct nuc980_ether *ether = netdev_priv(netdev);
 	struct nuc980_txbd *txbd;
 
 	txbd = ether->tdesc + ether->cur_tx;
 	if(txbd->mode & TX_OWEN_DMA) {
-		netif_stop_queue(dev);
+		netif_stop_queue(netdev);
 		return NETDEV_TX_BUSY;
+	}
+
+	if (NCSI_DEBUG)
+	{
+		// NC-SI debugging
+		uint16_t* proto_id = (uint16_t*)&skb->data[12];
+		if ( *proto_id == 0xf888 )
+			pr_info("TX(%d):%64ph\n", skb->len, skb->data);
 	}
 
 	txbd->buffer = dma_map_single(&ether->pdev->dev, skb->data,
 					skb->len, DMA_TO_DEVICE);
 
 //	tx_skb[ether->cur_tx]  = skb;
-	txbd->sl = skb->len;
+	txbd->sl = cpu_to_le32(skb->len);
 	wmb();	// This is dummy function for ARM9
 	txbd->mode |= TX_OWEN_DMA;
 	wmb();	// This is dummy function for ARM9
@@ -681,7 +740,7 @@ static int nuc980_ether_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		ether->cur_tx = 0;
 	txbd = ether->tdesc + ether->cur_tx;
 	if(txbd->mode & TX_OWEN_DMA) {
-		netif_stop_queue(dev);
+		netif_stop_queue(netdev);
 		//return NETDEV_TX_BUSY;
 	}
 	return NETDEV_TX_OK;
@@ -691,21 +750,21 @@ static irqreturn_t nuc980_tx_interrupt(int irq, void *dev_id)
 {
 	struct nuc980_ether *ether;
 	struct platform_device *pdev;
-	struct net_device *dev;
+	struct net_device *netdev;
 	unsigned int status;
 	struct sk_buff *s;
 	struct nuc980_txbd *txbd;
 
-	dev = dev_id;
-	ether = netdev_priv(dev);
+	netdev = dev_id;
+	ether = netdev_priv(netdev);
 	pdev = ether->pdev;
 
-	nuc980_get_and_clear_int(dev, &status, 0xFFFF0000);
+	nuc980_get_and_clear_int(netdev, &status, 0xFFFF0000);
 
 	txbd = ether->tdesc + ether->finish_tx;
 	while((txbd->mode & TX_OWEN_DMA) != TX_OWEN_DMA) {
 		if((s = tx_skb[ether->finish_tx]) != NULL) {
-			dma_unmap_single(&dev->dev, txbd->buffer, s->len, DMA_TO_DEVICE);
+			dma_unmap_single(&netdev->dev, txbd->buffer, s->len, DMA_TO_DEVICE);
 			dev_kfree_skb_irq(s);
 			tx_skb[ether->finish_tx] = NULL;
 			if (txbd->sl & TXDS_TXCP) {
@@ -727,8 +786,8 @@ static irqreturn_t nuc980_tx_interrupt(int irq, void *dev_id)
 		BUG();
 	}
 
-	if (netif_queue_stopped(dev)) {
-		netif_wake_queue(dev);
+	if (netif_queue_stopped(netdev)) {
+		netif_wake_queue(netdev);
 	}
 
 	return IRQ_HANDLED;
@@ -738,7 +797,7 @@ static int nuc980_poll(struct napi_struct *napi, int budget)
 {
 	struct nuc980_ether *ether = container_of(napi, struct nuc980_ether, napi);
 	struct nuc980_rxbd *rxbd;
-	struct net_device *dev = ether->ndev;
+	struct net_device *netdev = ether->netdev;
 	struct sk_buff *skb, *s;
 	unsigned int length, status;
 	int rx_cnt = 0;
@@ -759,25 +818,34 @@ static int nuc980_poll(struct napi_struct *napi, int budget)
 
 		if (likely(status & RXDS_RXGD)) {
 
-			skb = dev_alloc_skb(2048);
+			skb = dev_alloc_skb(MAX_PACKET_SIZE);
 			if (!skb) {
 				struct platform_device *pdev = ether->pdev;
 				dev_err(&pdev->dev, "get skb buffer error\n");
 				ether->stats.rx_dropped++;
 				goto rx_out;
 			}
-			dma_unmap_single(&dev->dev, (dma_addr_t)rxbd->buffer, 2048, DMA_FROM_DEVICE);
+			dma_unmap_single(&netdev->dev, (dma_addr_t)rxbd->buffer, MAX_PACKET_SIZE, DMA_FROM_DEVICE);
+
+                        if (NCSI_DEBUG)
+                        {
+				// NC-SI debugging
+		                uint16_t* proto_id = (uint16_t*)&s->data[12];
+		                if ( *proto_id == 0xf888 )
+		                        pr_info("RX(%d):%64ph\n", length, s->data);
+                        }
+
 
 			skb_put(s, length);
-			s->protocol = eth_type_trans(s, dev);
+			s->protocol = eth_type_trans(s, netdev);
 			netif_receive_skb(s);
 			ether->stats.rx_packets++;
 			ether->stats.rx_bytes += length;
 			skb_reserve(skb, 2);
-			skb->dev = dev;
+			skb->dev = netdev;
 
 			rxbd->buffer = dma_map_single(&ether->pdev->dev, skb->data,
-							2048, DMA_FROM_DEVICE);
+							MAX_PACKET_SIZE, DMA_FROM_DEVICE);
 
 			rx_skb[ether->cur_rx] = skb;
 			rx_cnt++;
@@ -819,11 +887,14 @@ rx_out:
 
 static irqreturn_t nuc980_rx_interrupt(int irq, void *dev_id)
 {
-	struct net_device *dev = (struct net_device *)dev_id;
-	struct nuc980_ether *ether = netdev_priv(dev);
+	struct net_device *netdev = (struct net_device *)dev_id;
+	struct nuc980_ether *ether = netdev_priv(netdev);
 	unsigned int status;
 
-	nuc980_get_and_clear_int(dev, &status, 0xFFFF);
+	nuc980_get_and_clear_int(netdev, &status, 0xFFFF);
+
+	if (NCSI_DEBUG)
+        	pr_info("%s: RX int:%08X\n", netdev->name, status);
 
 	if (unlikely(status & MISTA_RXBERR)) {
 		struct platform_device *pdev = ether->pdev;
@@ -844,56 +915,83 @@ static irqreturn_t nuc980_rx_interrupt(int irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
-
-static int nuc980_ether_open(struct net_device *dev)
+static int nuc980_ether_open(struct net_device *netdev)
 {
-	struct nuc980_ether *ether = netdev_priv(dev);
+	struct nuc980_ether *ether = netdev_priv(netdev);
 	struct platform_device *pdev = ether->pdev;
 
-	nuc980_reset_mac(dev);
-	nuc980_set_global_maccmd(dev);
+	int err;
 
-	if (request_irq(ether->txirq, nuc980_tx_interrupt,
-						0x0, pdev->name, dev)) {
+        nuc980_reset_mac(netdev);
+
+	err = request_irq(ether->txirq, nuc980_tx_interrupt, 0x0, pdev->name, netdev);
+	if (err) {
 		dev_err(&pdev->dev, "register irq tx failed\n");
-		return -EAGAIN;
+		goto err_txirq;
 	}
 
-	if (request_irq(ether->rxirq, nuc980_rx_interrupt,
-						IRQF_NO_SUSPEND, pdev->name, dev)) {
+	err = request_irq(ether->rxirq, nuc980_rx_interrupt, IRQF_NO_SUSPEND, pdev->name, netdev);
+	if (err) {
 		dev_err(&pdev->dev, "register irq rx failed\n");
-		free_irq(ether->txirq, dev);
-		return -EAGAIN;
+		goto err_rxirq;
 	}
 
-	phy_start(ether->phy_dev);
-	netif_start_queue(dev);
-	napi_enable(&ether->napi);
+ 	netif_start_queue(netdev);
+        napi_enable(&ether->napi);
 
-	ETH_ENABLE_RX;
+        ETH_ENABLE_RX;
 
-	dev_info(&pdev->dev, "%s is OPENED\n", dev->name);
+	if (netdev->phydev) {
+		/* If have a PHY, start polling */
+		phy_start(netdev->phydev);
+	} else if (ether->use_ncsi) {
+		dev_info(&pdev->dev, "%s uses NC-SI subsystem.\n", netdev->name);
+
+	        /* To set the speed to 100Mbit/s full duplex forcely, */
+                ether->duplex = DUPLEX_FULL;
+                ether->speed = SPEED_100;
+                nuc980_opmode(netdev, ether->speed, ether->duplex);
+
+		/* If using NC-SI subsystem, set our carrier on and start the stack */
+		netif_carrier_on(netdev);
+
+		/* Start the NC-SI device */
+		err = ncsi_start_dev(ether->ncsidev);
+		if (err)
+			goto err_ncsi;
+	}
+
+	dev_info(&pdev->dev, "%s is OPENED\n", netdev->name);
 
 	return 0;
+
+err_ncsi:
+	napi_disable(&ether->napi);
+	netif_stop_queue(netdev);
+	free_irq(ether->rxirq, netdev);
+err_rxirq:
+	free_irq(ether->txirq, netdev);
+err_txirq:
+	return err;
 }
 
-static void nuc980_ether_set_multicast_list(struct net_device *dev)
+static void nuc980_ether_set_multicast_list(struct net_device *netdev)
 {
 	struct nuc980_ether *ether;
 	unsigned int rx_mode;
 
-	ether = netdev_priv(dev);
+	ether = netdev_priv(netdev);
 
-	if (dev->flags & IFF_PROMISC)
+	if (netdev->flags & IFF_PROMISC)
 		rx_mode = CAMCMR_AUP | CAMCMR_AMP | CAMCMR_ABP | CAMCMR_ECMP;
-	else if ((dev->flags & IFF_ALLMULTI) || !netdev_mc_empty(dev))
+	else if ((netdev->flags & IFF_ALLMULTI) || !netdev_mc_empty(netdev))
 		rx_mode = CAMCMR_AMP | CAMCMR_ABP | CAMCMR_ECMP;
 	else
 		rx_mode = CAMCMR_ECMP | CAMCMR_ABP;
 	__raw_writel(rx_mode,  REG_CAMCMR);
 }
 
-static void nuc980_get_drvinfo(struct net_device *dev,
+static void nuc980_get_drvinfo(struct net_device *netdev,
 					struct ethtool_drvinfo *info)
 {
 	strlcpy(info->driver, DRV_MODULE_NAME, sizeof(info->driver));
@@ -902,36 +1000,36 @@ static void nuc980_get_drvinfo(struct net_device *dev,
 	strlcpy(info->bus_info, "N/A", sizeof(info->bus_info));
 }
 
-static u32 nuc980_get_msglevel(struct net_device *dev)
+static u32 nuc980_get_msglevel(struct net_device *netdev)
 {
-	struct nuc980_ether *ether = netdev_priv(dev);
+	struct nuc980_ether *ether = netdev_priv(netdev);
 
 	return ether->msg_enable;
 }
 
-static void nuc980_set_msglevel(struct net_device *dev, u32 level)
+static void nuc980_set_msglevel(struct net_device *netdev, u32 level)
 {
-	struct nuc980_ether *ether = netdev_priv(dev);
+	struct nuc980_ether *ether = netdev_priv(netdev);
 
 	ether->msg_enable = level;
 }
 
-static int nuc980_get_eee(struct net_device *dev, struct ethtool_eee *edata)
+static int nuc980_get_eee(struct net_device *netdev, struct ethtool_eee *edata)
 {
 	return -EOPNOTSUPP;
 }
 
-static int nuc980_set_eee(struct net_device *dev, struct ethtool_eee *edata)
+static int nuc980_set_eee(struct net_device *netdev, struct ethtool_eee *edata)
 {
 	return -EOPNOTSUPP;
 }
 
-static int nuc980_get_regs_len(struct net_device *dev)
+static int nuc980_get_regs_len(struct net_device *netdev)
 {
 	return 76 * sizeof(u32);
 }
 
-static void nuc980_get_regs(struct net_device *dev, struct ethtool_regs *regs, void *p)
+static void nuc980_get_regs(struct net_device *netdev, struct ethtool_regs *regs, void *p)
 {
 
 	regs->version = 0;
@@ -939,32 +1037,32 @@ static void nuc980_get_regs(struct net_device *dev, struct ethtool_regs *regs, v
 }
 
 #ifdef CONFIG_PM
-static void nuc980_get_wol(struct net_device *dev, struct ethtool_wolinfo *wol)
+static void nuc980_get_wol(struct net_device *netdev, struct ethtool_wolinfo *wol)
 {
-	struct nuc980_ether *ether = netdev_priv(dev);
+	struct nuc980_ether *ether = netdev_priv(netdev);
 
 	wol->supported = WAKE_MAGIC;
 	wol->wolopts = ether->wol ? WAKE_MAGIC : 0;
 
 }
 
-static int nuc980_set_wol(struct net_device *dev, struct ethtool_wolinfo *wol)
+static int nuc980_set_wol(struct net_device *netdev, struct ethtool_wolinfo *wol)
 {
-	struct nuc980_ether *ether = netdev_priv(dev);
+	struct nuc980_ether *ether = netdev_priv(netdev);
 
 	if (wol->wolopts & ~WAKE_MAGIC)
 		return -EINVAL;
 
 	ether->wol = wol->wolopts & WAKE_MAGIC ? 1 : 0;
 
-	device_set_wakeup_capable(&dev->dev, wol->wolopts & WAKE_MAGIC);
-	device_set_wakeup_enable(&dev->dev, wol->wolopts & WAKE_MAGIC);
+	device_set_wakeup_capable(&netdev->dev, wol->wolopts & WAKE_MAGIC);
+	device_set_wakeup_enable(&netdev->dev, wol->wolopts & WAKE_MAGIC);
 
 	return 0;
 }
 #endif
 
-static int nuc980_get_ts_info(struct net_device *dev, struct ethtool_ts_info *info)
+static int nuc980_get_ts_info(struct net_device *netdev, struct ethtool_ts_info *info)
 {
 	info->so_timestamping = SOF_TIMESTAMPING_TX_HARDWARE |
 				SOF_TIMESTAMPING_RX_HARDWARE |
@@ -977,23 +1075,17 @@ static int nuc980_get_ts_info(struct net_device *dev, struct ethtool_ts_info *in
 	return 0;
 }
 
-static int nuc980_change_mtu(struct net_device *dev, int new_mtu)
+static int nuc980_change_mtu(struct net_device *netdev, int new_mtu)
 {
-	unsigned int val;
-
 	if(new_mtu < 64 || new_mtu > 2048)
 		return -EINVAL;
 
-	if(new_mtu < 1500)
-	{
-		val = __raw_readl(REG_MCMDR);
-		val &= ~(MCMDR_ALP | MCMDR_ARP);
-		__raw_writel(val, REG_MCMDR);
-	}
-	else
-		nuc980_enable_alp(dev);
+	netdev->mtu = new_mtu;
 
-	dev->mtu = new_mtu;
+	if(new_mtu < 1500)
+		nuc980_set_alp(netdev, false);
+	else
+		nuc980_set_alp(netdev, true);
 
 	return 0;
 }
@@ -1028,28 +1120,39 @@ static const struct net_device_ops nuc980_ether_netdev_ops = {
 	.ndo_change_mtu		= nuc980_change_mtu,
 };
 
-static void __init get_mac_address(struct net_device *dev)
+static void __init get_mac_address(struct net_device *netdev)
 {
-	struct nuc980_ether *ether = netdev_priv(dev);
+	struct nuc980_ether *ether = netdev_priv(netdev);
 	struct platform_device *pdev;
 
 	pdev = ether->pdev;
 
 	if (is_valid_ether_addr(nuc980_mac0))
-		memcpy(dev->dev_addr, &nuc980_mac0[0], 0x06);
+		memcpy(netdev->dev_addr, &nuc980_mac0[0], 0x06);
 	else
 		dev_err(&pdev->dev, "invalid mac address\n");
 }
 
 
-static int nuc980_mii_setup(struct net_device *dev)
+static int nuc980_mii_setup(struct net_device *netdev)
 {
-	struct nuc980_ether *ether = netdev_priv(dev);
+	struct nuc980_ether *ether = netdev_priv(netdev);
 	struct platform_device *pdev;
 	struct phy_device *phydev;
 	int i, err = 0;
 
 	pdev = ether->pdev;
+
+	if (ether->phy_dn) {
+		ether->phy_dev = of_phy_connect(netdev, ether->phy_dn,
+					&adjust_link, 0, 0);
+		if (!ether->phy_dn) {
+			dev_err(&netdev->dev, "could not connect to phy %pOF\n",
+				ether->phy_dn);
+			return -ENODEV;
+		}
+		return 0;
+	}
 
 	ether->mii_bus = mdiobus_alloc();
 	if (!ether->mii_bus) {
@@ -1090,7 +1193,7 @@ static int nuc980_mii_setup(struct net_device *dev)
 		goto out3;
 	}
 
-	phydev = phy_connect(dev, phydev_name(phydev),
+	phydev = phy_connect(netdev, phydev_name(phydev),
 			     &adjust_link,
 			     PHY_INTERFACE_MODE_RMII);
 
@@ -1118,18 +1221,30 @@ out0:
 	return err;
 }
 
+static void nuc980_ncsi_handler(struct ncsi_dev *ncsidev)
+{
+	if (unlikely(ncsidev->state != ncsi_dev_state_functional))
+		return;
+
+	netdev_info(ncsidev->dev, "NCSI interface %s\n",
+		    ncsidev->link_up ? "up" : "down");
+}
+
+
 static int nuc980_ether_probe(struct platform_device *pdev)
 {
 	struct nuc980_ether *ether;
-	struct net_device *dev;
+	struct net_device *netdev;
 	int error;
 	struct pinctrl *pinctrl;
 
-	dev = alloc_etherdev(sizeof(struct nuc980_ether));
-	if (!dev)
+	struct device_node *np = pdev->dev.of_node;
+
+	netdev = alloc_etherdev(sizeof(struct nuc980_ether));
+	if (!netdev)
 		return -ENOMEM;
 
-	ether = netdev_priv(dev);
+	ether = netdev_priv(netdev);
 
 	ether->res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (ether->res == NULL) {
@@ -1157,9 +1272,9 @@ static int nuc980_ether_probe(struct platform_device *pdev)
 		goto err0;
 	}
 
-	SET_NETDEV_DEV(dev, &pdev->dev);
-	platform_set_drvdata(pdev, dev);
-	ether->ndev = dev;
+	SET_NETDEV_DEV(netdev, &pdev->dev);
+	platform_set_drvdata(pdev, netdev);
+	ether->netdev = netdev;
 
 	ether->eclk = clk_get(NULL, "emac0_eclk");
 	if (IS_ERR(ether->eclk)) {
@@ -1187,14 +1302,14 @@ static int nuc980_ether_probe(struct platform_device *pdev)
 	ether->pdev = pdev;
 	ether->msg_enable = NETIF_MSG_LINK;
 
-	dev->netdev_ops = &nuc980_ether_netdev_ops;
-	dev->ethtool_ops = &nuc980_ether_ethtool_ops;
+	netdev->netdev_ops = &nuc980_ether_netdev_ops;
+	netdev->ethtool_ops = &nuc980_ether_ethtool_ops;
 
-	dev->tx_queue_len = 32;
-	dev->dma = 0x0;
-	dev->watchdog_timeo = TX_TIMEOUT;
+	netdev->tx_queue_len = 32;
+	netdev->dma = 0x0;
+	netdev->watchdog_timeo = TX_TIMEOUT;
 
-	get_mac_address(dev);
+	get_mac_address(netdev);
 
 	ether->cur_tx = 0x0;
 	ether->cur_rx = 0x0;
@@ -1204,41 +1319,77 @@ static int nuc980_ether_probe(struct platform_device *pdev)
 	ether->duplex = DUPLEX_FULL;
 	spin_lock_init(&ether->lock);
 
-	netif_napi_add(dev, &ether->napi, nuc980_poll, 32);
+	netif_napi_add(netdev, &ether->napi, nuc980_poll, 32);
 
-	ether_setup(dev);
+	if (pdev->dev.of_node &&
+	    of_get_property(pdev->dev.of_node, "use-ncsi", NULL)) {
+		if (!IS_ENABLED(CONFIG_NET_NCSI)) {
+			dev_err(&pdev->dev, "CONFIG_NET_NCSI not enabled\n");
+			error = -ENODEV;
+			goto failed_free_napi;
+		}
+		dev_info(&pdev->dev, "Using NCSI interface\n");
+		ether->use_ncsi = true;
+		ether->ncsidev = ncsi_register_dev(netdev, nuc980_ncsi_handler);
+		if (!ether->ncsidev) {
+			error = -ENODEV;
+			goto failed_free_napi;
+		}
+	} else {
+		ether->use_ncsi = false;
 
-	if((error = nuc980_mii_setup(dev)) < 0) {
-		dev_err(&pdev->dev, "nuc980_mii_setup err\n");
-		goto err2;
+		ether->phy_dn = of_parse_phandle(np, "phy-handle", 0);
+		if (!ether->phy_dn && of_phy_is_fixed_link(np)) {
+			error = of_phy_register_fixed_link(np);
+			if (error < 0)
+				goto failed_free_napi;
+			ether->phy_dn = of_node_get(np);
+		}
+
+		error = nuc980_mii_setup(netdev);
+		if (error < 0) {
+			dev_err(&pdev->dev, "nuc980_mii_setup err\n");
+			goto failed_free_napi;
+		}
 	}
-	netif_carrier_off(dev);
-	error = register_netdev(dev);
+
+	error = register_netdev(netdev);
 	if (error != 0) {
 		dev_err(&pdev->dev, "register_netdev() failed\n");
 		error = -ENODEV;
-		goto err2;
+		goto failed_free_napi;
 	}
 
 	return 0;
 
-err2:
+failed_free_napi:
+	of_node_put(ether->phy_dn);
+	if (of_phy_is_fixed_link(np))
+		of_phy_deregister_fixed_link(np);
+	netif_napi_del(&ether->napi);
 	clk_disable(ether->clk);
 	clk_put(ether->clk);
 err1:
 	platform_set_drvdata(pdev, NULL);
 err0:
-	free_netdev(dev);
+	free_netdev(netdev);
 
 	return error;
 }
 
 static int nuc980_ether_remove(struct platform_device *pdev)
 {
-	struct net_device *dev = platform_get_drvdata(pdev);
-	struct nuc980_ether *ether = netdev_priv(dev);
+	struct net_device *netdev = platform_get_drvdata(pdev);
+	struct nuc980_ether *ether = netdev_priv(netdev);
+	struct device_node *np = pdev->dev.of_node;
 
-	unregister_netdev(dev);
+	netif_napi_del(&ether->napi);
+
+	unregister_netdev(netdev);
+
+	of_node_put(ether->phy_dn);
+	if (of_phy_is_fixed_link(np))
+		of_phy_deregister_fixed_link(np);
 
 	clk_disable(ether->clk);
 	clk_put(ether->clk);
@@ -1246,9 +1397,11 @@ static int nuc980_ether_remove(struct platform_device *pdev)
 	clk_disable(ether->eclk);
 	clk_put(ether->eclk);
 
-	free_irq(ether->txirq, dev);
-	free_irq(ether->rxirq, dev);
-	phy_disconnect(ether->phy_dev);
+	free_irq(ether->txirq, netdev);
+	free_irq(ether->rxirq, netdev);
+
+	if (ether->phy_dev)
+		phy_disconnect(ether->phy_dev);
 
 	mdiobus_unregister(ether->mii_bus);
 	kfree(ether->mii_bus->irq);
@@ -1256,17 +1409,17 @@ static int nuc980_ether_remove(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, NULL);
 
-	free_netdev(dev);
+	free_netdev(netdev);
 	return 0;
 }
 
 #ifdef CONFIG_PM
 static int nuc980_ether_suspend(struct platform_device *pdev, pm_message_t state)
 {
-	struct net_device *dev = platform_get_drvdata(pdev);
+	struct net_device *netdev = platform_get_drvdata(pdev);
 	struct nuc980_ether *ether = netdev_priv(dev);
 
-	netif_device_detach(dev);
+	netif_device_detach(netdev);
 
 	if(netif_running(dev)) {
 		ETH_DISABLE_TX;
@@ -1278,7 +1431,10 @@ static int nuc980_ether_suspend(struct platform_device *pdev, pm_message_t state
 			__raw_writel(__raw_readl(REG_MCMDR) | MCMDR_MGPWAKE, REG_MCMDR);
 			__raw_writel(__raw_readl(REG_WKUPSER1) | (1 << 16), REG_WKUPSER1);
 		} else {
-			phy_stop(ether->phy_dev);
+			if (ether->phy_dev)
+				phy_stop(ether->phy_dev);
+			else if (ether->use_ncsi)
+				ncsi_stop_dev(ether->ncsidev);
 		}
 
 	}
@@ -1290,17 +1446,19 @@ static int nuc980_ether_suspend(struct platform_device *pdev, pm_message_t state
 static int nuc980_ether_resume(struct platform_device *pdev)
 {
 
-	struct net_device *dev = platform_get_drvdata(pdev);
-	struct nuc980_ether *ether = netdev_priv(dev);
+	struct net_device *netdev = platform_get_drvdata(pdev);
+	struct nuc980_ether *ether = netdev_priv(netdev);
 
-	if (netif_running(dev)) {
+	if (netif_running(netdev)) {
 
 		if(ether->wol) {  // enable wakeup from magic packet
 			__raw_writel(__raw_readl(REG_WKUPSER1) & ~(1 << 16), REG_WKUPSER1);
 			__raw_writel(__raw_readl(REG_MCMDR) & ~MCMDR_MGPWAKE, REG_MCMDR);
 		} else {
-
-			phy_start(ether->phy_dev);
+			if (ether->phy_dev)
+				phy_start(ether->phy_dev);
+			else if (ether->use_ncsi)
+				netif_carrier_on(netdev);
 		}
 
 		napi_enable(&ether->napi);
@@ -1310,7 +1468,7 @@ static int nuc980_ether_resume(struct platform_device *pdev)
 
 	}
 
-	netif_device_attach(dev);
+	netif_device_attach(netdev);
 	return 0;
 
 }
