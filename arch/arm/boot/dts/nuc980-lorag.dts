@@ -1,0 +1,216 @@
+/*
+ * Device Tree Source for NUC980 DEV board
+ *
+ * Copyright (C) 2018 Nuvoton Technology Corp.
+ *
+ * The code contained herein is licensed under the GNU General Public
+ * License. You may obtain a copy of the GNU General Public License
+ * Version 2 or later at the following locations:
+ *
+ * http://www.opensource.org/licenses/gpl-license.html
+ * http://www.gnu.org/copyleft/gpl.html
+ */
+/dts-v1/;
+
+#include "nuc980.dtsi"
+
+/ {
+	model = "Nuvoton NUC980 NuMaker-LoRaG-NUC980";
+	compatible = "nuvoton,nuc980-dev-v1.0", "nuvoton,nuc980";
+
+	chosen {
+		bootargs = "root=/dev/ram0 console=ttyS0,115200n8 rdinit=/sbin/init mem=64M lpj=744448";
+	};
+
+	apb {
+		uart1: serial@b0071000 {
+			status = "disabled";
+		};
+
+		uart2: serial@b0072000 {
+			status = "disabled";
+		};
+
+		uart3: serial@b0073000 {
+			status = "disabled";
+		};
+
+		uart4: serial@b0074000 {
+			status = "disabled";
+		};
+
+		uart5: serial@b0075000 {
+			status = "disabled";
+		};
+
+		uart6: serial@b0076000 {
+			status = "disabled";
+		};
+
+		uart7: serial@b0077000 {
+			status = "disabled";
+		};
+
+		uart8: serial@b0078000 {
+			status = "disabled";
+		};
+
+		uart9: serial@b0079000 {
+			status = "disabled";
+		};
+
+		can0: can@b00a0000 {
+			status = "disabled";
+		};
+
+		can1: can@b00a1000 {
+			status = "disabled";
+		};
+
+		rtc: rtc@b0041000 {
+			status = "disabled";
+		};
+
+		nadc: nadc@b0043000 {
+			status = "disabled";
+		};
+
+		pwm0: pwm@b0058000 {
+			status = "disabled";
+		};
+
+		pwm1: pwm@b0059000 {
+			status = "disabled";
+		};
+
+
+		etimer0: etimer0@b0050000 {
+			status = "okay";
+		};
+
+		etimer1: etimer1@b0050100 {
+			status = "okay";
+		};
+
+		etimer2: etimer2@b0051000 {
+			status = "okay";
+		};
+
+		etimer3: etimer3@b0051100 {
+			status = "okay";
+		};
+
+		i2c0: i2c0@b0080000 {
+			status = "okay";
+
+			pinctrl-0 = <&pinctrl_i2c0_PA>;
+			nau8822: nau8822@1a {
+				compatible = "nuvoton,nau8822";
+				reg = <0x1a> ;
+			};
+		};
+
+		i2c1: i2c1@b0081000 {
+			status = "disabled";
+			pinctrl-0 = <&pinctrl_i2c1_PB>;
+		};
+
+
+		i2c2: i2c2@b0082000 {
+			status = "disabled";
+			pinctrl-0 = <&pinctrl_i2c2_PB>;
+		};
+
+	};
+
+	ahb {
+
+		usbh_ehci@b0015000 {
+			status = "okay";
+		};
+		usbh_ohci@b0017000{
+			status = "okay";
+		};
+
+		usbdev@b0016000 {
+			status = "okay";
+		};
+
+		fmi@b0019000 {
+			compatible = "nuvoton,nuc980-fmi", "nand";
+			pinctrl-names = "default";
+			pinctrl-0 = <&pinctrl_nand>;
+			status = "okay";
+			nand-ecc-mode = "hw_oob_first";
+			nand-ecc-algo = "bch";
+			nand-bus-width = <8>;
+			nand-ecc-strength = <8>;
+			nand-ecc-step-size = <512>;
+			nand-on-flash-bbt;
+
+			partitions {
+				compatible = "fixed-partitions";
+				#address-cells = <1>;
+				#size-cells = <1>;
+
+				uboot@0 {
+					label = "uboot";
+					reg = <0x0000000 0x200000>;
+					read-only;
+				};
+				kernel@200000 {
+					label = "kernel";
+					reg = <0x200000 0x1400000>;
+				};
+				user@1600000 {
+					label = "user";
+					reg = <0x1600000 0x6480000>;
+				};
+			};
+		};
+
+		sdh@b0018000 {
+			status = "okay";
+		};
+
+		emac0@b0012000 {
+			status = "okay";
+		};
+		emac1@b0022000 {
+			status = "disabled";
+		};
+		ccap0@b0024000 {
+			status = "disabled";
+		};
+		i2c_gpio0: i2c-gpio-0 {
+			status = "disabled";
+		};
+		ccap1@b0014000 {
+			status = "disabled";
+		};
+		i2c_gpio1: i2c-gpio-1 {
+			status = "disabled";
+		};
+		dma@b0008000 {
+			status = "okay";
+		};
+
+		i2s: i2s@b0020000 {
+			status = "okay";
+		};
+
+		i2s_pcm: i2s_pcm {
+			status = "okay";
+		};
+
+		sound {
+			compatible = "nuvoton,nuc980-audio";
+			i2s-controller = <&i2s>;
+			i2s-platform = <&i2s_pcm>;
+			status = "disabled";
+		};
+		ebi: ebi@b0010000 {
+			status = "okay";
+		};
+	};
+};
