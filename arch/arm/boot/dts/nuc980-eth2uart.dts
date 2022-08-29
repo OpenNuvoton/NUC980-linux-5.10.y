@@ -11,7 +11,8 @@
  * http://www.gnu.org/copyleft/gpl.html
  */
 /dts-v1/;
-/include/ "nuc980.dtsi"
+
+#include "nuc980.dtsi"
 
 / {
 	model = "Nuvoton NUC980 DEV V1.0";
@@ -73,7 +74,7 @@
 
 		uart8: serial@b0078000 {
 			pinctrl-names = "default";
-			pinctrl-0 = <&pinctrl_uart8_PA>;
+			pinctrl-0 = <&pinctrl_uart8_PA_PG>;
 			pdma-enable = <1>;
 			status = "okay";
 		};
@@ -98,15 +99,15 @@
 			status = "disabled";
 		};
 
-		pwm0: pwm0@b0058000 {
+		pwm0: pwm@b0058000 {
 			status = "disabled";
 		};
 
-		pwm1: pwm1@b0059000 {
+		pwm1: pwm@b0059000 {
 			status = "disabled";
 		};
 
-		qspi0: qspi0@b0060000 {
+		qspi0: spi@b0060000 {
 			status = "disabled";
 			#address-cells = <1>;
 			#size-cells = <0>;
@@ -121,7 +122,7 @@
 			txbitlen = <8>;
 			bus_num	= <0>;
 
-			flash: m25p80@0 {
+			flash: flash@0 {
 				compatible = "w25q128";
 				#address-cells = <1>;
 				#size-cells = <1>;
@@ -139,7 +140,7 @@
 			};
 		};
 
-		spi0: spi0@b0061000 {
+		spi0: spi@b0061000 {
 			status = "disabled";
 			#address-cells = <1>;
 			#size-cells = <0>;
@@ -154,14 +155,14 @@
 			txbitlen = <8>;
 			bus_num	= <1>;
 
-			spidev@0x01 {
+			spidev@0 {
 				compatible = "spidev";
 				spi-max-frequency = <30000000>;
 				reg = <0>;
 			};
 		};
 
-		spi1: spi1@b0062000 {
+		spi1: spi@b0062000 {
 			status = "disabled";
 			#address-cells = <1>;
 			#size-cells = <0>;
@@ -176,7 +177,7 @@
 			txbitlen = <8>;
 			bus_num	= <1>;
 
-			spidev@0x01 {
+			spidev@0 {
 				compatible = "spidev";
 				spi-max-frequency = <30000000>;
 				reg = <0>;

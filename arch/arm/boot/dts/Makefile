@@ -1413,4 +1413,5 @@ dtb-$(CONFIG_ARCH_NUC980) += \
 	nuc980-dev-v1.0.dtb \
 	nuc980-iot-v1.0.dtb \
 	nuc980-lorag.dtb \
+	nuc980-eth2uart.dtb \
 	nuc980-chili.dtb
