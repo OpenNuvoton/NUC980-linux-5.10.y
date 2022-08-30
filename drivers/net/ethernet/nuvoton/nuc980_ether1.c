@@ -65,7 +65,6 @@
 #define MCMDR_ALP		(0x01 << 1)
 #define MCMDR_ARP		(0x01 << 2)
 #define MCMDR_ACP		(0x01 << 3)
-#define MCMDR_AEP		(0x01 << 4)
 #define MCMDR_SPCRC		(0x01 << 5)
 #define MCMDR_MGPWAKE		(0x01 << 6)
 #define MCMDR_TXON		(0x01 << 8)
@@ -151,8 +150,6 @@
 #else
 #define IS_VLAN 0
 #endif
-
-#define NCSI_DEBUG 0
 
 // (ETH_FRAME_LEN + (IS_VLAN * VLAN_HLEN) + ETH_FCS_LEN + Align Size) < 0x600
 #define MAX_PACKET_SIZE           1536
@@ -515,14 +512,11 @@ static void nuc980_get_and_clear_int(struct net_device *netdev,
 
 static void nuc980_set_global_maccmd(struct net_device *netdev)
 {
-        struct nuc980_ether *ether = netdev_priv(netdev);
 	unsigned int val;
 
 	val = __raw_readl( REG_MCMDR) |
 		MCMDR_SPCRC |
-		MCMDR_ACP |
-		/* NC-SI RX packets cause CRC error. Here, accept them. */
-		(MCMDR_AEP * ether->use_ncsi);
+		MCMDR_ACP;
 	if (IS_VLAN)
         {
 		val |= MCMDR_ALP;
@@ -717,14 +711,6 @@ static int nuc980_ether_start_xmit(struct sk_buff *skb, struct net_device *netde
 		return NETDEV_TX_BUSY;
 	}
 
-	if (NCSI_DEBUG)
-	{
-		// NC-SI debugging
-		uint16_t* proto_id = (uint16_t*)&skb->data[12];
-		if ( *proto_id == 0xf888 )
-			pr_info("TX(%d):%64ph\n", skb->len, skb->data);
-	}
-
 	txbd->buffer = dma_map_single(&ether->pdev->dev, skb->data,
 					skb->len, DMA_TO_DEVICE);
 
@@ -827,15 +813,6 @@ static int nuc980_poll(struct napi_struct *napi, int budget)
 			}
 			dma_unmap_single(&netdev->dev, (dma_addr_t)rxbd->buffer, MAX_PACKET_SIZE, DMA_FROM_DEVICE);
 
-                        if (NCSI_DEBUG)
-                        {
-				// NC-SI debugging
-		                uint16_t* proto_id = (uint16_t*)&s->data[12];
-		                if ( *proto_id == 0xf888 )
-		                        pr_info("RX(%d):%64ph\n", length, s->data);
-                        }
-
-
 			skb_put(s, length);
 			s->protocol = eth_type_trans(s, netdev);
 			netif_receive_skb(s);
@@ -892,9 +869,6 @@ static irqreturn_t nuc980_rx_interrupt(int irq, void *dev_id)
 	unsigned int status;
 
 	nuc980_get_and_clear_int(netdev, &status, 0xFFFF);
-
-	if (NCSI_DEBUG)
-        	pr_info("%s: RX int:%08X\n", netdev->name, status);
 
 	if (unlikely(status & MISTA_RXBERR)) {
 		struct platform_device *pdev = ether->pdev;
