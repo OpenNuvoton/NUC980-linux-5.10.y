@@ -15,7 +15,7 @@
 #include "nuc980.dtsi"
 
 / {
-	model = "Nuvoton NUC980 Chili V1.0";
+	model = "Nuvoton NUC980 CHILI V1.0";
 	compatible = "nuvoton,nuc980-dev-v1.0", "nuvoton,nuc980";
 
 	chosen {
@@ -36,7 +36,10 @@
 		};
 
 		uart4: serial@b0074000 {
-			status = "disabled";
+			pinctrl-names = "default";
+			pinctrl-0 = <&pinctrl_uart4_PC>;
+			pdma-enable = <1>;
+			status = "okay";		
 		};
 
 		uart5: serial@b0075000 {
@@ -52,7 +55,10 @@
 		};
 
 		uart8: serial@b0078000 {
-			status = "disabled";
+			pinctrl-names = "default";
+			pinctrl-0 = <&pinctrl_uart8_PC>;
+			pdma-enable = <1>;
+			status = "okay";
 		};
 
 		uart9: serial@b0079000 {
@@ -65,6 +71,11 @@
 
 		can1: can@b00a1000 {
 			status = "disabled";
+		};
+
+		can3: can@b00a3000 {
+			pinctrl-0 = <&pinctrl_can3_PA>;
+			status = "okay";
 		};
 
 		rtc: rtc@b0041000 {
@@ -103,7 +114,10 @@
 		i2c0: i2c0@b0080000 {
 			status = "disabled";
 
-			pinctrl-0 = <&pinctrl_i2c0_PA>;
+			nau8822: nau8822@1a {
+				compatible = "nuvoton,nau8822";
+				reg = <0x1a> ;
+			};
 		};
 
 		i2c1: i2c1@b0081000 {
@@ -117,14 +131,46 @@
 			pinctrl-0 = <&pinctrl_i2c2_PB>;
 		};
 
+		qspi0: spi@b0060000 {
+			status = "okay";
+			flash: flash@0 {
+				compatible = "w25q128";
+				#address-cells = <1>;
+				#size-cells = <1>;
+				reg = <0>;
+				spi-max-frequency = <30000000>;
+
+				partition@0 {
+					label = "uboot";
+					reg = <0x00000000 0x0040000>;
+				};
+				
+				partition@1 {
+					label = "kernel";
+					reg = <0x200000 0xA00000>;  
+				};
+				partition@2 {
+					label = "dtb";
+					reg = <0xC00000 0x0010000>;
+				};
+				
+				partition@3 {
+					label = "rootfs";
+					reg = <0xC10000 0x1200000>;
+				};
+			};
+		};
 	};
 
 	ahb {
 
 		usbh_ehci@b0015000 {
+			pinctrl-0 = <>; /*disable PWREN and OVC*/
+			ov_active = <1>;/*disable PWREN and OVC*/
 			status = "okay";
 		};
 		usbh_ohci@b0017000{
+			ov_active = <1>;/*disable PWREN and OVC*/
 			status = "okay";
 		};
 
@@ -166,22 +212,25 @@
 		};
 
 		sdh@b0018000 {
-			status = "disabled";
+			status = "okay";
 		};
 
 		emac0@b0012000 {
-			status = "disabled";
-		};
-		emac1@b0022000 {
-			#use-ncsi;
 			status = "okay";
 		};
-		cap0@b0024000 {
-			model = "nt99141";
+		emac1@b0022000 {
 			status = "disabled";
 		};
-		cap1@b0014000 {
-			model = "nt99141";
+		ccap0@b0024000 {
+			status = "disabled";
+		};
+		i2c_gpio0: i2c-gpio-0 {
+			status = "disabled";
+		};
+		ccap1@b0014000 {
+			status = "disabled";
+		};
+		i2c_gpio1: i2c-gpio-1 {
 			status = "disabled";
 		};
 		dma@b0008000 {
@@ -203,7 +252,7 @@
 			status = "disabled";
 		};
 		ebi: ebi@b0010000 {
-			status = "okay";
+			status = "disabled";
 		};
 	};
 };
