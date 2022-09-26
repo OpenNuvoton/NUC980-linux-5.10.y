@@ -131,7 +131,7 @@
 			bus_num	= <0>;
 
 			flash: flash@0 {
-				compatible = "spinand,mt29f";
+				compatible = "spi-nand";
 				#address-cells = <1>;
 				#size-cells = <1>;
 				reg = <0>;
