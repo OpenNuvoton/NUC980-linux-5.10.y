@@ -134,7 +134,7 @@
 		qspi0: spi@b0060000 {
 			status = "okay";
 			flash: flash@0 {
-				compatible = "spi-nand";
+				compatible = "w25q128";
 				#address-cells = <1>;
 				#size-cells = <1>;
 				reg = <0>;
