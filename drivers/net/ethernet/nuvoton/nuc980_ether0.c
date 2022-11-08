@@ -1200,8 +1200,12 @@ static int nuc980_poll(struct napi_struct *napi, int budget)
 		status = rxbd->sl;
 		length = status & 0xFFFF;
 
-		if (likely(status & RXDS_RXGD)) {
-
+		if (likely((status & RXDS_RXGD) && 
+#if (IS_VLAN == 1)
+		(length <= MAX_PACKET_SIZE))) {
+#else
+		(length <= 1514))) {
+#endif
 			skb = dev_alloc_skb(MAX_PACKET_SIZE);
 			if (!skb) {
 				struct platform_device *pdev = ether->pdev;
@@ -1477,12 +1481,12 @@ static int nuc980_get_ts_info(struct net_device *netdev, struct ethtool_ts_info 
 
 static int nuc980_change_mtu(struct net_device *netdev, int new_mtu)
 {
-	if(new_mtu < 64 || new_mtu > 2048)
+	if(new_mtu < 64 || new_mtu > MAX_PACKET_SIZE)
 		return -EINVAL;
 
 	netdev->mtu = new_mtu;
 
-	if(new_mtu < 1500)
+	if(new_mtu < 1518)
 		nuc980_set_alp(netdev, false);
 	else
 		nuc980_set_alp(netdev, true);

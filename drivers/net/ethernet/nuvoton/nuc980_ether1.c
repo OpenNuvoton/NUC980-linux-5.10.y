@@ -1200,8 +1200,12 @@ static int nuc980_poll(struct napi_struct *napi, int budget)
 		status = rxbd->sl;
 		length = status & 0xFFFF;
 
-		if (likely(status & RXDS_RXGD)) {
-
+		if (likely((status & RXDS_RXGD) && 
+#if (IS_VLAN == 1)
+		(length <= MAX_PACKET_SIZE))) {
+#else
+		(length <= 1514))) {
+#endif
 			skb = dev_alloc_skb(MAX_PACKET_SIZE);
 			if (!skb) {
 				struct platform_device *pdev = ether->pdev;
