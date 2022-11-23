@@ -608,7 +608,7 @@ static int clear_one_vid(struct ncsi_dev_priv *ndp, struct ncsi_channel *nc,
 	bitmap = &ncf->bitmap;
 
 	spin_lock_irqsave(&nc->lock, flags);
-	index = find_next_bit(bitmap, ncf->n_vids, 0);
+	index = find_first_bit(bitmap, ncf->n_vids);
 	if (index >= ncf->n_vids) {
 		spin_unlock_irqrestore(&nc->lock, flags);
 		return -1;
@@ -627,7 +627,7 @@ static int clear_one_vid(struct ncsi_dev_priv *ndp, struct ncsi_channel *nc,
 	return 0;
 }
 
-/* Find an outstanding VLAN tag and constuct a "Set VLAN Filter - Enable"
+/* Find an outstanding VLAN tag and construct a "Set VLAN Filter - Enable"
  * packet.
  */
 static int set_one_vid(struct ncsi_dev_priv *ndp, struct ncsi_channel *nc,
@@ -667,7 +667,7 @@ static int set_one_vid(struct ncsi_dev_priv *ndp, struct ncsi_channel *nc,
 		return -1;
 	}
 
-	index = find_next_zero_bit(bitmap, ncf->n_vids, 0);
+	index = find_first_zero_bit(bitmap, ncf->n_vids);
 	if (index < 0 || index >= ncf->n_vids) {
 		netdev_err(ndp->ndev.dev,
 			   "Channel %u already has all VLAN filters set\n",
@@ -689,6 +689,64 @@ static int set_one_vid(struct ncsi_dev_priv *ndp, struct ncsi_channel *nc,
 	return 0;
 }
 
+#if IS_ENABLED(CONFIG_NCSI_OEM_CMD_KEEP_PHY)
+
+static int ncsi_oem_keep_phy_intel(struct ncsi_cmd_arg *nca)
+{
+	unsigned char data[NCSI_OEM_INTEL_CMD_KEEP_PHY_LEN];
+	int ret = 0;
+
+	nca->payload = NCSI_OEM_INTEL_CMD_KEEP_PHY_LEN;
+
+	memset(data, 0, NCSI_OEM_INTEL_CMD_KEEP_PHY_LEN);
+	*(unsigned int *)data = ntohl((__force __be32)NCSI_OEM_MFR_INTEL_ID);
+
+	data[4] = NCSI_OEM_INTEL_CMD_KEEP_PHY;
+
+	/* PHY Link up attribute */
+	data[6] = 0x1;
+
+	nca->data = data;
+
+	ret = ncsi_xmit_cmd(nca);
+	if (ret)
+		netdev_err(nca->ndp->ndev.dev,
+			   "NCSI: Failed to transmit cmd 0x%x during configure\n",
+			   nca->type);
+	return ret;
+}
+
+#endif
+
+#if IS_ENABLED(CONFIG_NCSI_OEM_CMD_INTEL_OS2BMC)
+
+static int ncsi_oem_enable_os2bmc_intel(struct ncsi_cmd_arg *nca)
+{
+	unsigned char data[NCSI_OEM_INTEL_CMD_OS2BMC_LEN];
+	int ret = 0;
+
+	nca->payload = NCSI_OEM_INTEL_CMD_OS2BMC_LEN;
+
+	memset(data, 0, NCSI_OEM_INTEL_CMD_OS2BMC_LEN);
+	*(unsigned int *)data = ntohl((__force __be32)NCSI_OEM_MFR_INTEL_ID);
+	data[4] = NCSI_OEM_INTEL_CMD_OS2BMC;
+
+	/* Enable both Network-to-BMC and Host-to-BMC traffic */
+	data[5] = NCSI_OEM_INTEL_CMD_OS2BMC_PARAM;
+
+	nca->data = data;
+
+	ret = ncsi_xmit_cmd(nca);
+	if (ret)
+		netdev_err(nca->ndp->ndev.dev,
+			   "NCSI: Failed to transmit cmd 0x%x during configure\n",
+			   nca->type);
+	return ret;
+}
+
+#endif
+
+
 #if IS_ENABLED(CONFIG_NCSI_OEM_CMD_GET_MAC)
 
 /* NCSI OEM Command APIs */
@@ -700,7 +758,7 @@ static int ncsi_oem_gma_handler_bcm(struct ncsi_cmd_arg *nca)
 	nca->payload = NCSI_OEM_BCM_CMD_GMA_LEN;
 
 	memset(data, 0, NCSI_OEM_BCM_CMD_GMA_LEN);
-	*(unsigned int *)data = ntohl(NCSI_OEM_MFR_BCM_ID);
+	*(unsigned int *)data = ntohl((__force __be32)NCSI_OEM_MFR_BCM_ID);
 	data[5] = NCSI_OEM_BCM_CMD_GMA;
 
 	nca->data = data;
@@ -724,7 +782,7 @@ static int ncsi_oem_gma_handler_mlx(struct ncsi_cmd_arg *nca)
 	nca->payload = NCSI_OEM_MLX_CMD_GMA_LEN;
 
 	memset(&u, 0, sizeof(u));
-	u.data_u32[0] = ntohl(NCSI_OEM_MFR_MLX_ID);
+	u.data_u32[0] = ntohl((__force __be32)NCSI_OEM_MFR_MLX_ID);
 	u.data_u8[5] = NCSI_OEM_MLX_CMD_GMA;
 	u.data_u8[6] = NCSI_OEM_MLX_CMD_GMA_PARAM;
 
@@ -747,7 +805,7 @@ static int ncsi_oem_smaf_mlx(struct ncsi_cmd_arg *nca)
 	int ret = 0;
 
 	memset(&u, 0, sizeof(u));
-	u.data_u32[0] = ntohl(NCSI_OEM_MFR_MLX_ID);
+	u.data_u32[0] = ntohl((__force __be32)NCSI_OEM_MFR_MLX_ID);
 	u.data_u8[5] = NCSI_OEM_MLX_CMD_SMAF;
 	u.data_u8[6] = NCSI_OEM_MLX_CMD_SMAF_PARAM;
 	memcpy(&u.data_u8[MLX_SMAF_MAC_ADDR_OFFSET],
@@ -766,13 +824,36 @@ static int ncsi_oem_smaf_mlx(struct ncsi_cmd_arg *nca)
 	return ret;
 }
 
+static int ncsi_oem_gma_handler_intel(struct ncsi_cmd_arg *nca)
+{
+	unsigned char data[NCSI_OEM_INTEL_CMD_GMA_LEN];
+	int ret = 0;
+
+	nca->payload = NCSI_OEM_INTEL_CMD_GMA_LEN;
+
+	memset(data, 0, NCSI_OEM_INTEL_CMD_GMA_LEN);
+	*(unsigned int *)data = ntohl((__force __be32)NCSI_OEM_MFR_INTEL_ID);
+	data[4] = NCSI_OEM_INTEL_CMD_GMA;
+
+	nca->data = data;
+
+	ret = ncsi_xmit_cmd(nca);
+	if (ret)
+		netdev_err(nca->ndp->ndev.dev,
+			   "NCSI: Failed to transmit cmd 0x%x during configure\n",
+			   nca->type);
+
+	return ret;
+}
+
 /* OEM Command handlers initialization */
 static struct ncsi_oem_gma_handler {
 	unsigned int	mfr_id;
 	int		(*handler)(struct ncsi_cmd_arg *nca);
 } ncsi_oem_gma_handlers[] = {
 	{ NCSI_OEM_MFR_BCM_ID, ncsi_oem_gma_handler_bcm },
-	{ NCSI_OEM_MFR_MLX_ID, ncsi_oem_gma_handler_mlx }
+	{ NCSI_OEM_MFR_MLX_ID, ncsi_oem_gma_handler_mlx },
+	{ NCSI_OEM_MFR_INTEL_ID, ncsi_oem_gma_handler_intel }
 };
 
 static int ncsi_gma_handler(struct ncsi_cmd_arg *nca, unsigned int mf_id)
@@ -986,6 +1067,20 @@ static void ncsi_configure_channel(struct ncsi_dev_priv *ndp)
 				   "NCSI: Failed to transmit CMD_CIS\n");
 			goto error;
 		}
+
+#if IS_ENABLED(CONFIG_NCSI_OEM_CMD_INTEL_OS2BMC)
+		nd->state = ncsi_dev_state_config_intel_os2bmc;
+		break;
+	case ncsi_dev_state_config_intel_os2bmc:
+		nca.type = NCSI_PKT_CMD_OEM;
+		nca.package = np->id;
+		nca.channel = nc->id;
+		ndp->pending_req_num = 1;
+		ret = ncsi_oem_enable_os2bmc_intel(&nca);
+
+		if (ret)
+			goto error;
+#endif /* CONFIG_NCSI_OEM_CMD_INTEL_OS2BMC */
 
 		nd->state = ncsi_dev_state_config_oem_gma;
 		break;
@@ -1392,7 +1487,23 @@ static void ncsi_probe_channel(struct ncsi_dev_priv *ndp)
 		}
 
 		nd->state = ncsi_dev_state_probe_gvi;
+		if (IS_ENABLED(CONFIG_NCSI_OEM_CMD_KEEP_PHY))
+			nd->state = ncsi_dev_state_probe_keep_phy;
 		break;
+#if IS_ENABLED(CONFIG_NCSI_OEM_CMD_KEEP_PHY)
+	case ncsi_dev_state_probe_keep_phy:
+		ndp->pending_req_num = 1;
+
+		nca.type = NCSI_PKT_CMD_OEM;
+		nca.package = ndp->active_package->id;
+		nca.channel = 0;
+		ret = ncsi_oem_keep_phy_intel(&nca);
+		if (ret)
+			goto error;
+
+		nd->state = ncsi_dev_state_probe_gvi;
+		break;
+#endif /* CONFIG_NCSI_OEM_CMD_KEEP_PHY */
 	case ncsi_dev_state_probe_gvi:
 	case ncsi_dev_state_probe_gc:
 	case ncsi_dev_state_probe_gls:
@@ -1735,7 +1846,8 @@ struct ncsi_dev *ncsi_register_dev(struct net_device *dev,
 	pdev = to_platform_device(dev->dev.parent);
 	if (pdev) {
 		np = pdev->dev.of_node;
-		if (np && of_get_property(np, "mlx,multi-host", NULL))
+		if (np && (of_get_property(np, "mellanox,multi-host", NULL) ||
+			   of_get_property(np, "mlx,multi-host", NULL)))
 			ndp->mlx_multi_host = true;
 	}
 
