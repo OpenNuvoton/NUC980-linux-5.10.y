@@ -1528,7 +1528,6 @@ void nuc980serial_set_clock(struct uart_nuc980_port *up)
 		clk_enable(clk);
 	}
 
-#ifdef CONFIG_NUC980_UART1
 	if(up->port.line == 1) {
 		clk = clk_get(NULL, "uart1");
 		clk_prepare(clk);
@@ -1547,9 +1546,7 @@ void nuc980serial_set_clock(struct uart_nuc980_port *up)
 		clk_set_rate(clk, 150000000);
 		up->port.uartclk = clk_get_rate(clk);
 	}
-#endif
 
-#ifdef CONFIG_NUC980_UART2
 	if(up->port.line == 2) {
 		clk = clk_get(NULL, "uart2");
 		clk_prepare(clk);
@@ -1568,9 +1565,7 @@ void nuc980serial_set_clock(struct uart_nuc980_port *up)
 		clk_set_rate(clk, 150000000);
 		up->port.uartclk = clk_get_rate(clk);
 	}
-#endif
 
-#ifdef CONFIG_NUC980_UART3
 	if(up->port.line == 3) {
 		clk = clk_get(NULL, "uart3");
 		clk_prepare(clk);
@@ -1589,9 +1584,7 @@ void nuc980serial_set_clock(struct uart_nuc980_port *up)
 		clk_set_rate(clk, 150000000);
 		up->port.uartclk = clk_get_rate(clk);
 	}
-#endif
 
-#ifdef CONFIG_NUC980_UART4
 	if(up->port.line == 4) {
 		clk = clk_get(NULL, "uart4");
 		clk_prepare(clk);
@@ -1610,9 +1603,7 @@ void nuc980serial_set_clock(struct uart_nuc980_port *up)
 		clk_set_rate(clk, 150000000);
 		up->port.uartclk = clk_get_rate(clk);
 	}
-#endif
 
-#ifdef CONFIG_NUC980_UART5
 	if(up->port.line == 5) {
 		clk = clk_get(NULL, "uart5");
 		clk_prepare(clk);
@@ -1631,9 +1622,7 @@ void nuc980serial_set_clock(struct uart_nuc980_port *up)
 		clk_set_rate(clk, 150000000);
 		up->port.uartclk = clk_get_rate(clk);
 	}
-#endif
 
-#ifdef CONFIG_NUC980_UART6
 	if(up->port.line == 6) {
 		clk = clk_get(NULL, "uart6");
 		clk_prepare(clk);
@@ -1652,9 +1641,7 @@ void nuc980serial_set_clock(struct uart_nuc980_port *up)
 		clk_set_rate(clk, 150000000);
 		up->port.uartclk = clk_get_rate(clk);
 	}
-#endif
 
-#ifdef CONFIG_NUC980_UART7
 	if(up->port.line == 7) {
 		clk = clk_get(NULL, "uart7");
 		clk_prepare(clk);
@@ -1674,9 +1661,7 @@ void nuc980serial_set_clock(struct uart_nuc980_port *up)
 		clk_set_rate(clk, 150000000);
 		up->port.uartclk = clk_get_rate(clk);
 	}
-#endif
 
-#ifdef CONFIG_NUC980_UART8
 	if(up->port.line == 8) {
 		clk = clk_get(NULL, "uart8");
 		clk_prepare(clk);
@@ -1695,9 +1680,7 @@ void nuc980serial_set_clock(struct uart_nuc980_port *up)
 		clk_set_rate(clk, 150000000);
 		up->port.uartclk = clk_get_rate(clk);
 	}
-#endif
 
-#ifdef CONFIG_NUC980_UART9
 	if(up->port.line == 9) {
 		clk = clk_get(NULL, "uart9");
 		clk_prepare(clk);
@@ -1716,8 +1699,6 @@ void nuc980serial_set_clock(struct uart_nuc980_port *up)
 		clk_set_rate(clk, 150000000);
 		up->port.uartclk = clk_get_rate(clk);
 	}
-#endif
-
 }
 
 #if defined(CONFIG_USE_OF)
