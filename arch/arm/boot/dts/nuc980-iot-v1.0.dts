@@ -252,7 +252,7 @@
 			compatible = "nuvoton,nuc980-fmi", "nand";
 			pinctrl-names = "default";
 			pinctrl-0 = <&pinctrl_nand>;
-			status = "okay";
+			status = "disabled";
 			#address-cells = <1>;
 			#size-cells = <1>;
 
