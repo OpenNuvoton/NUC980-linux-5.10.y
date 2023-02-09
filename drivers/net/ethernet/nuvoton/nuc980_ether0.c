@@ -1821,11 +1821,11 @@ static int nuc980_ether_remove(struct platform_device *pdev)
 static int nuc980_ether_suspend(struct platform_device *pdev, pm_message_t state)
 {
 	struct net_device *netdev = platform_get_drvdata(pdev);
-	struct nuc980_ether *ether = netdev_priv(dev);
+	struct nuc980_ether *ether = netdev_priv(netdev);
 
 	netif_device_detach(netdev);
 
-	if(netif_running(dev)) {
+	if (netif_running(netdev)) {
 		ETH_DISABLE_TX;
 		ETH_DISABLE_RX;
 
