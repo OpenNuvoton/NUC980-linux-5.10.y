@@ -429,7 +429,7 @@ static int nuc980_pwm_remove(struct platform_device *pdev)
 static u32 pcr_save, cnr0_save, cnr1_save, cnr2_save, cnr3_save;
 static int nuc980_pwm_suspend(struct platform_device *pdev, pm_message_t state)
 {
-	struct nuc980_chip *chip = dev_get_drvdata(dev);
+	struct nuc980_chip *nuc980 = platform_get_drvdata(pdev);
 
 #ifdef DEBUG_PWM
 	printk("Enter %s ....\n",__FUNCTION__);
@@ -464,7 +464,7 @@ static int nuc980_pwm_suspend(struct platform_device *pdev, pm_message_t state)
 
 static int nuc980_pwm_resume(struct platform_device *pdev)
 {
-	struct nuc980_chip *chip = dev_get_drvdata(dev);
+	struct nuc980_chip *nuc980 = platform_get_drvdata(pdev);
 
 #ifdef DEBUG_PWM
 	printk("Enter %s ....\n",__FUNCTION__);
