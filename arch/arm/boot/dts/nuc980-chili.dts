@@ -182,7 +182,7 @@
 			compatible = "nuvoton,nuc980-fmi", "nand";
 			pinctrl-names = "default";
 			pinctrl-0 = <&pinctrl_nand>;
-			status = "okay";
+			status = "disabled";
 			nand-ecc-mode = "hw_oob_first";
 			nand-ecc-algo = "bch";
 			nand-bus-width = <8>;
@@ -212,7 +212,7 @@
 		};
 
 		sdh@b0018000 {
-			status = "okay";
+			status = "disabled";
 		};
 
 		emac0@b0012000 {

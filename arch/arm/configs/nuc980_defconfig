@@ -2,10 +2,10 @@
 # Automatically generated file; DO NOT EDIT.
 # Linux/arm 5.10.103 Kernel Configuration
 #
-CONFIG_CC_VERSION_TEXT="arm-nuvoton-linux-uclibcgnueabi-gcc.br_real (Buildroot 2021.02.6-22-g091609571a-dirty) 9.4.0"
+CONFIG_CC_VERSION_TEXT="gcc (Ubuntu 9.4.0-1ubuntu1~20.04.1) 9.4.0"
 CONFIG_CC_IS_GCC=y
 CONFIG_GCC_VERSION=90400
-CONFIG_LD_VERSION=235020000
+CONFIG_LD_VERSION=234000000
 CONFIG_CLANG_VERSION=0
 CONFIG_LLD_VERSION=0
 CONFIG_CC_CAN_LINK=y
@@ -375,7 +375,6 @@ CONFIG_ARCH_HIBERNATION_POSSIBLE=y
 # end of Firmware Drivers
 
 # CONFIG_ARM_CRYPTO is not set
-CONFIG_AS_VFP_VMRS_FPINST=y
 
 #
 # General architecture-dependent options
@@ -440,10 +439,6 @@ CONFIG_ARCH_HAS_GCOV_PROFILE_ALL=y
 # end of GCOV-based kernel profiling
 
 CONFIG_HAVE_GCC_PLUGINS=y
-CONFIG_GCC_PLUGINS=y
-# CONFIG_GCC_PLUGIN_CYC_COMPLEXITY is not set
-# CONFIG_GCC_PLUGIN_LATENT_ENTROPY is not set
-# CONFIG_GCC_PLUGIN_RANDSTRUCT is not set
 # end of General architecture-dependent options
 
 CONFIG_RT_MUTEXES=y
@@ -550,19 +545,38 @@ CONFIG_IP_MULTICAST=y
 # CONFIG_IP_PNP is not set
 # CONFIG_NET_IPIP is not set
 # CONFIG_NET_IPGRE_DEMUX is not set
+CONFIG_NET_IP_TUNNEL=y
 # CONFIG_IP_MROUTE is not set
 # CONFIG_SYN_COOKIES is not set
 # CONFIG_NET_IPVTI is not set
 # CONFIG_NET_FOU is not set
+# CONFIG_NET_FOU_IP_TUNNELS is not set
 # CONFIG_INET_AH is not set
 # CONFIG_INET_ESP is not set
 # CONFIG_INET_IPCOMP is not set
+CONFIG_INET_TUNNEL=y
 # CONFIG_INET_DIAG is not set
 # CONFIG_TCP_CONG_ADVANCED is not set
 CONFIG_TCP_CONG_CUBIC=y
 CONFIG_DEFAULT_TCP_CONG="cubic"
 # CONFIG_TCP_MD5SIG is not set
-# CONFIG_IPV6 is not set
+CONFIG_IPV6=y
+# CONFIG_IPV6_ROUTER_PREF is not set
+# CONFIG_IPV6_OPTIMISTIC_DAD is not set
+# CONFIG_INET6_AH is not set
+# CONFIG_INET6_ESP is not set
+# CONFIG_INET6_IPCOMP is not set
+# CONFIG_IPV6_MIP6 is not set
+# CONFIG_IPV6_VTI is not set
+CONFIG_IPV6_SIT=y
+# CONFIG_IPV6_SIT_6RD is not set
+CONFIG_IPV6_NDISC_NODETYPE=y
+# CONFIG_IPV6_TUNNEL is not set
+# CONFIG_IPV6_MULTIPLE_TABLES is not set
+# CONFIG_IPV6_MROUTE is not set
+# CONFIG_IPV6_SEG6_LWTUNNEL is not set
+# CONFIG_IPV6_SEG6_HMAC is not set
+# CONFIG_IPV6_RPL_LWTUNNEL is not set
 # CONFIG_MPTCP is not set
 # CONFIG_NETWORK_SECMARK is not set
 # CONFIG_NETWORK_PHY_TIMESTAMPING is not set
@@ -584,6 +598,7 @@ CONFIG_HAVE_NET_DSA=y
 # CONFIG_X25 is not set
 # CONFIG_LAPB is not set
 # CONFIG_PHONET is not set
+# CONFIG_6LOWPAN is not set
 # CONFIG_IEEE802154 is not set
 # CONFIG_NET_SCHED is not set
 # CONFIG_DCB is not set
@@ -679,6 +694,8 @@ CONFIG_NUC980_CAN=y
 # CONFIG_PSAMPLE is not set
 # CONFIG_NET_IFE is not set
 # CONFIG_LWTUNNEL is not set
+CONFIG_DST_CACHE=y
+CONFIG_GRO_CELLS=y
 # CONFIG_FAILOVER is not set
 CONFIG_ETHTOOL_NETLINK=y
 CONFIG_HAVE_EBPF_JIT=y
@@ -2845,9 +2862,6 @@ CONFIG_LSM="lockdown,yama,loadpin,safesetid,integrity,bpf"
 # Memory initialization
 #
 CONFIG_INIT_STACK_NONE=y
-# CONFIG_GCC_PLUGIN_STRUCTLEAK_USER is not set
-# CONFIG_GCC_PLUGIN_STRUCTLEAK_BYREF is not set
-# CONFIG_GCC_PLUGIN_STRUCTLEAK_BYREF_ALL is not set
 # CONFIG_INIT_ON_ALLOC_DEFAULT_ON is not set
 # CONFIG_INIT_ON_FREE_DEFAULT_ON is not set
 # end of Memory initialization
