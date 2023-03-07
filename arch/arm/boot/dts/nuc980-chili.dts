@@ -134,7 +134,7 @@
 		qspi0: spi@b0060000 {
 			status = "okay";
 			flash: flash@0 {
-				compatible = "w25q128";
+				compatible = "w25q256";
 				#address-cells = <1>;
 				#size-cells = <1>;
 				reg = <0>;
@@ -142,22 +142,22 @@
 
 				partition@0 {
 					label = "uboot";
-					reg = <0x00000000 0x0040000>;
+					reg = <0x00000000 0x00040000>;
 				};
-				
 				partition@1 {
 					label = "kernel";
-					reg = <0x200000 0xA00000>;  
+					reg = <0x00200000 0x00C00000>;
 				};
 				partition@2 {
 					label = "dtb";
-					reg = <0xC00000 0x0010000>;
+					reg = <0x00E00000 0x00010000>;
 				};
 				
 				partition@3 {
 					label = "rootfs";
-					reg = <0xC10000 0x1200000>;
+					reg = <0x00E10000 0x011f0000>;
 				};
+
 			};
 		};
 	};
