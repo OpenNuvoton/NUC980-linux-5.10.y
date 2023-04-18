@@ -19,12 +19,15 @@
 #include <linux/blkdev.h>
 #include <linux/delay.h>
 #include <linux/err.h>
+#include <linux/device.h>
 #include <linux/dma-mapping.h>
 #include <linux/clk.h>
 #include <linux/atmel_pdc.h>
 #include <linux/gfp.h>
 #include <linux/freezer.h>
 #include <linux/of.h>
+#include <linux/of_device.h>
+#include <linux/pinctrl/consumer.h>
 
 #include <linux/mmc/host.h>
 
@@ -124,11 +127,11 @@ static void nuc980_fmi_reset_host(struct nuc980_fmi_host *host)
 	LEAVE();
 }
 
-static void nuc980_fmi_timeout_timer(unsigned long data)
+static void nuc980_fmi_timeout_timer(struct timer_list *t)
 {
 	struct nuc980_fmi_host *host;
 
-	host = (struct nuc980_fmi_host *)data;
+	host = from_timer(host, t, timer);
 	ENTRY();
 	if (host->request) {
 		dev_err(host->mmc->parent, "Timeout waiting end of packet\n");
@@ -917,7 +920,7 @@ static int nuc980_fmi_probe(struct platform_device *pdev)
 	}
 
 	/* add a thread to check CO, RI, and R2 */
-	setup_timer(&host->timer, nuc980_fmi_timeout_timer, (unsigned long)host);
+	timer_setup(&host->timer, nuc980_fmi_timeout_timer, 0);
 	platform_set_drvdata(pdev, mmc);
 
 	/*

@@ -639,7 +639,7 @@ config MMC_NUC980_SD
 
 config MMC_NUC980_FMI
 	tristate "Nuvoton NUC980 FMI-SD support"
-	depends on MACH_NUC980 && NUC980_FMI_SD0
+	depends on ARCH_NUC980 && NUC980_FMI_SD0 
 
 config MMC_S3C
 	tristate "Samsung S3C SD/MMC Card Interface support"
