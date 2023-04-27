@@ -28,6 +28,14 @@ config TOUCHSCREEN_88PM860X
 	  To compile this driver as a module, choose M here: the
 	  module will be called 88pm860x-ts.
 
+config TOUCHSCREEN_NUC980
+	tristate "NUC980 touchscreen(ADC) support"
+	depends on ARCH_NUC980
+	help
+	  This selects support for the resistive touchscreen controller
+	  found on Nuvoton MA35D1. The ADC driver is also implement
+	  in this driver.
+
 config TOUCHSCREEN_ADS7846
 	tristate "ADS7846/TSC2046/AD7873 and AD(S)7843 based touchscreens"
 	depends on SPI_MASTER
