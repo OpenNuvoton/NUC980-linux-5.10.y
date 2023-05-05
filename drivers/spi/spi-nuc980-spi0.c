@@ -233,11 +233,20 @@ static int nuc980_spi0_txrx(struct spi_device *spi, struct spi_transfer *t)
 	struct nuc980_dma_config dma_crx,dma_ctx;
 	dma_cookie_t            cookie;
 #elif defined(CONFIG_SPI_NUC980_SPI0_NO_PDMA)
-	unsigned int    i,j;
+	unsigned int    i, j, len;
+	/* supports 9 bits data width
+	unsigned int	bytes_per_word;
+
+	bytes_per_word = DIV_ROUND_UP(t->bits_per_word, 8);
+	len = t->len / bytes_per_word;
+	*/
+
+	len = t->len;
 
 	hw->tx = t->tx_buf;
 	hw->rx = t->rx_buf;
 #endif
+
 
 	__raw_writel(__raw_readl(hw->regs + REG_FIFOCTL) | 0x3, hw->regs + REG_FIFOCTL); //CWWeng : RXRST & TXRST
 	while (__raw_readl(hw->regs + REG_STATUS) & (1<<23)); //TXRXRST
@@ -372,28 +381,14 @@ static int nuc980_spi0_txrx(struct spi_device *spi, struct spi_transfer *t)
 	if (hw->rx) {
 		j = 0;
 
-		for(i = 0; i < t->len; ) {
-			if(((__raw_readl(hw->regs + REG_STATUS) & 0x20000) == 0x00000)) //TX NOT FULL
-			{
-				__raw_writel(hw_tx(hw, i), hw->regs + REG_TX);
-				i++;
-			}
-			if(((__raw_readl(hw->regs + REG_STATUS) & 0x100) == 0x000)) //RX NOT EMPTY
-			{
-				hw_rx(hw, __raw_readl(hw->regs + REG_RX), j);
-				j++;
-			}
-		}
-		while(j < t->len)
-		{
-			if(((__raw_readl(hw->regs + REG_STATUS) & 0x100) == 0x000)) //RX NOT EMPTY
-			{
-				hw_rx(hw, __raw_readl(hw->regs + REG_RX), j);
-				j++;
-			}
+		for (i = 0; i < len; i++) {
+			while (((__raw_readl(hw->regs + REG_STATUS) & 0x20000) == 0x20000)); //TXFULL
+			__raw_writel(hw_tx(hw, i), hw->regs + REG_TX);
+			while (((__raw_readl(hw->regs + REG_STATUS) & 0x100) == 0x100)); //RXEMPTY
+			hw_rx(hw, __raw_readl(hw->regs + REG_RX), i);
 		}
 	} else {
-		for(i = 0; i < t->len; i++) {
+		for (i = 0; i < len; i++) {
 			while (((__raw_readl(hw->regs + REG_STATUS) & 0x20000) == 0x20000)); //TXFULL
 			__raw_writel(hw_tx(hw, i), hw->regs + REG_TX);
 		}
@@ -880,7 +875,18 @@ static int nuc980_spi0_remove(struct platform_device *dev)
 {
 	struct nuc980_spi *hw = platform_get_drvdata(dev);
 
-	free_irq(hw->irq, hw);
+#if defined(CONFIG_SPI_NUC980_SPI0_PDMA)
+	struct nuc980_ip_dma *pdma=&dma;
+	dma_cap_mask_t mask;
+#endif
+
+#if defined(CONFIG_SPI_NUC980_SPI0_PDMA)
+	if (pdma->chan_rx)
+		dma_release_channel(pdma->chan_rx);
+	if (pdma->chan_tx)
+		dma_release_channel(pdma->chan_tx);
+#endif
+
 	platform_set_drvdata(dev, NULL);
 	spi_bitbang_stop(&hw->bitbang);
 
