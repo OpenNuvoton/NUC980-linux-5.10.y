@@ -182,7 +182,7 @@ static int usb_nuc980_probe(const struct hc_driver *driver,
 	__raw_writel(0x160, (volatile void __iomem *)physical_map_ehci+0xC4);
 	__raw_writel(0x520, (volatile void __iomem *)physical_map_ehci+0xC8);
 
-	__raw_writel(__raw_readl(NUC980_VA_OHCI+0x204) | 0xfc0000, (volatile void __iomem *)(NUC980_VA_OHCI+0x204));
+	//__raw_writel(__raw_readl(NUC980_VA_OHCI+0x204) | 0xfc0000, (volatile void __iomem *)(NUC980_VA_OHCI+0x204));
 
 	/* cache this readonly data; minimize chip reads */
 	ehci->hcs_params = readl(&ehci->caps->hcs_params);
