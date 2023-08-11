@@ -560,7 +560,7 @@ static inline int nuc980_nand_dma_transfer(struct nand_chip *chip, const u_char 
 			dev_err(nand->dev, "dma mapping error\n");
 			return -EINVAL;
 		}
-		nand->dma_buf = (unsigned char *) dma_addr;
+		nand->dma_buf = (unsigned char *) addr;
 
 		writel((unsigned long)dma_addr, REG_NAND_DMACSAR);
 		writel ( readl(REG_SMCSR) | 0x2, REG_SMCSR);
