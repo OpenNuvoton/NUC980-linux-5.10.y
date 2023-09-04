@@ -237,15 +237,15 @@
 		usbh_ehci@b0015000 {
 			pinctrl-0 = <>; /*disable PWREN and OVC*/
 			ov_active = <1>;/*disable PWREN and OVC*/
-			status = "disabled";
+			status = "okay";
 		};
 		usbh_ohci@b0017000{
 			ov_active = <1>;/*disable PWREN and OVC*/
-			status = "disabled";
+			status = "okay";
 		};
 
 		usbdev@b0016000 {
-			status = "disabled";
+			status = "okay";
 		};
 
 		fmi@b0019000 {
