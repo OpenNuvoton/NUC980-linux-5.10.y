@@ -1833,18 +1833,6 @@ static int ccap_graph_init(struct ccap_device *ccap)
 	return 0;
 }
 
-static int  ccap_get_port_number(struct platform_device *pdev)
-{
-        u32   val32[2];
-
-        if (of_property_read_u32_array(pdev->dev.of_node, "port-number", val32, 1) != 0) {
-                printk("%s - can not get port-number!\n", __func__);
-                return -EINVAL;
-        }
-	printk("ccap_get_port_number============>%d\n",val32[0]);
-        return val32[0];
-}
-
 static int ccap_probe(struct platform_device *pdev)
 {
 	struct v4l2_pix_format *pix;

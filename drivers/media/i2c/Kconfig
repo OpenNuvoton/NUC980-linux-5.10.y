@@ -726,16 +726,22 @@ config VIDEO_SMIAPP_PLL
 	tristate
 
 config VIDEO_NT99141
-        tristate "Novatek NT99141 sensor support"
+        tristate "Novatek NT99141 sensor support for NUC980"
         depends on VIDEO_V4L2 && I2C
         help
            Novatek sensor support
 
 config VIDEO_HM1055
-        tristate "HiMax HM1055 sensor support"
+        tristate "HiMax HM1055 sensor support for NUC980"
         depends on VIDEO_V4L2 && I2C
         help
            HiMax sensor support
+
+config VIDEO_OV7725
+        tristate "OV7725 sensor support for NUC980"
+        depends on VIDEO_V4L2 && I2C
+        help
+           OV7725 sensor support
 
 config VIDEO_HI556
 	tristate "Hynix Hi-556 sensor support"
