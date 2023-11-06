@@ -1862,7 +1862,7 @@
 		};
 
 		ccap0@b0024000 {
-			compatible = "nuvoton,nuc980-ccap0";
+			compatible = "nuvoton,nuc980-ccap";
 			reg = <0xb0024000 0x1000>;
 			interrupts = <14 4 1>;
 			status = "disabled";
@@ -1903,7 +1903,7 @@
 		};
 
 		ccap1@b0014000 {
-			compatible = "nuvoton,nuc980-ccap1";
+			compatible = "nuvoton,nuc980-ccap";
 			reg = <0xb0014000 0x1000>;
 			interrupts = <33 4 1>;
 			status = "disabled";
