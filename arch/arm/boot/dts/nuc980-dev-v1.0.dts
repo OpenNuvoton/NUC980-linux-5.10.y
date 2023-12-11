@@ -210,7 +210,7 @@
 			status = "okay";
 		};
 		ebi: ebi@b0010000 {
-			status = "okay";
+			status = "disabled";
 		};
 	};
 };
