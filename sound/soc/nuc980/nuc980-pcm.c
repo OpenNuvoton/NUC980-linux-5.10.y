@@ -19,7 +19,6 @@
 #include <sound/pcm.h>
 #include <sound/pcm_params.h>
 #include <sound/soc.h>
-#include <sound/dmaengine_pcm.h>
 
 #include <mach/hardware.h>
 
@@ -321,23 +320,16 @@ struct snd_soc_component_driver nuc980_asrc_component = {
 	.pointer	= nuc980_dma_pointer,
 	.mmap		= nuc980_dma_mmap,
 };
-EXPORT_SYMBOL_GPL(nuc980_asrc_component);
 
-static const struct snd_dmaengine_pcm_config nuc980_dmaengine_pcm_config = {
-	.pcm_hardware = &nuc980_pcm_hardware,
-	.prepare_slave_config = snd_dmaengine_pcm_prepare_slave_config,
-	.prealloc_buffer_size = 32 * 1024,
-};
 
 static int nuc980_soc_platform_probe(struct platform_device *pdev)
 {
-	return devm_snd_dmaengine_pcm_register(&pdev->dev, &nuc980_dmaengine_pcm_config,
-	                                       SND_DMAENGINE_PCM_FLAG_COMPAT);
+	return devm_snd_soc_register_component(&pdev->dev, &nuc980_asrc_component,
+					       NULL, 0);
 }
 
 static int nuc980_soc_platform_remove(struct platform_device *pdev)
 {
-	snd_dmaengine_pcm_unregister(&pdev->dev);
 	return 0;
 }
 
