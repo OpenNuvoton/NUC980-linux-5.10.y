@@ -693,6 +693,17 @@
 				};
 			};
 
+			adc0 {
+				pinctrl_adc0: adc0 {
+					nuvoton,pins =
+						<1 0x4 0x8 0
+						 1 0x5 0x8 0
+						 1 0x6 0x8 0
+						 1 0x7 0x8 0
+						>;
+				};
+			};
+
 			qspi0 {
 				pinctrl_qspi0: qspi0 {
 					nuvoton,pins =
