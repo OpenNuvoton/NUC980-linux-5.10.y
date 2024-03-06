@@ -242,6 +242,16 @@
 			pinctrl-0 = <&pinctrl_i2c3_PB>;
 		};
 
+		keys: keys@b000b000 {
+			status = "okay";
+			key-matrix = <2 1>;
+			gpio-keys-rows = <138
+							  140>; /* PE10, PE12 */
+			// gpio-keys-cols = <c0 c1>;  /* property for keypad matrix only */
+			key-code = <KEY_DOWN
+						KEY_UP>;
+		};
+
 	};
 
 	ahb {
