@@ -201,6 +201,7 @@
                buswidth = <8>;
                bgr;
                dc-gpios = <&gpio 0xA9 GPIO_ACTIVE_HIGH>; // PF.9 as C/D pin
+               led-gpios = <&gpio 0xC7 GPIO_ACTIVE_HIGH>; // PG.7 as LCM_EN
                debug = <0x0>;
                compatible = "ilitek,ili9341";
                reg = <0>;
