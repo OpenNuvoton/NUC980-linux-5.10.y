@@ -259,7 +259,7 @@
 
 
 		i2c2: i2c2@b0082000 {
-			status = "okay";
+			status = "disabled";
 			pinctrl-0 = <&pinctrl_i2c2_PB>;
 		};
 
