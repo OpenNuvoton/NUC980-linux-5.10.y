@@ -184,7 +184,7 @@ static const struct nand_manufacturer_desc nand_manufacturer_descs[] = {
 	{NAND_MFR_SANDISK, "SanDisk"},
 	{NAND_MFR_STMICRO, "ST Micro"},
 	{NAND_MFR_TOSHIBA, "Toshiba", &toshiba_nand_manuf_ops},
-	{NAND_MFR_WINBOND, "Winbond"},
+	{NAND_MFR_WINBOND, "Winbond", &winbond_nand_manuf_ops},
 };
 
 /**

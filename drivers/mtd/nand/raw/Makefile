@@ -67,6 +67,7 @@ nand-objs += nand_amd.o
 nand-objs += nand_esmt.o
 nand-objs += nand_hynix.o
 nand-objs += nand_macronix.o
+nand-objs += nand_winbond.o
 nand-objs += nand_micron.o
 nand-objs += nand_samsung.o
 nand-objs += nand_toshiba.o
