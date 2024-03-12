@@ -112,6 +112,17 @@ static void scan_key(struct timer_list *t)
 		}
 	}
 
+	if (is_keypad_mode) {
+		// resume col status
+		for (i = 0; i < col_cnt; i++) {
+			group = gpio_col[i] / GPIO_OFFSET;
+			num = gpio_col[i] % GPIO_OFFSET;
+
+			writel(readl(REG_GPIOA_DOUT + group*0x40) & ~( 0x1 << num ),
+						REG_GPIOA_DOUT + group*0x40); // write low
+		}
+	}
+
 	// check key status pin by pin
 	for (i = 0; i < key_cnt; i++) {
 		if ((new_key ^ old_key) & (0x1 << i)) {
@@ -193,7 +204,6 @@ int nuc980_kpd_open(struct input_dev *input)
 	for (i = 0; i < row_cnt; i++) {
 		// clear isr status
 		writel(0x1 << (gpio_row[i] % GPIO_OFFSET), REG_GPIOA_INTSRC + (gpio_row[i] / GPIO_OFFSET)*0x40);
-		//gpio_irq_table[i] = IRQ_GPIO_START + gpio_row[i];
 		error =  request_irq(IRQ_GPIO_START + gpio_row[i], nuc980_kpd_irq, IRQF_TRIGGER_FALLING | IRQF_TRIGGER_RISING | IRQF_NO_SUSPEND, "Keys", NULL);
 		if (error) {
 			dev_err(input->dev.parent, "Failed to register GPIO#%d IRQ.\n", gpio_row[i]);
@@ -206,7 +216,6 @@ int nuc980_kpd_open(struct input_dev *input)
 		for (i = 0; i < col_cnt; i++) {
 			// clear isr status
 			writel(0x1 << (gpio_col[i] % GPIO_OFFSET), REG_GPIOA_INTSRC + (gpio_col[i] / GPIO_OFFSET)*0x40);
-			//gpio_irq_table[i] = IRQ_GPIO_START + gpio_col[i];
 			error =  request_irq(IRQ_GPIO_START + gpio_col[i], kpi_interrupt_handle__, IRQF_TRIGGER_FALLING | IRQF_NO_SUSPEND, "Keys",NULL);
 			if (error) {
 				dev_err(input->dev.parent, "Failed to register GPIO#%d IRQ.\n", gpio_col[i]);
