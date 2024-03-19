@@ -269,6 +269,7 @@ static int nuc980_qspi0_txrx(struct spi_device *spi, struct spi_transfer *t)
 			}
 		}
 
+		while (__raw_readl(hw->regs + REG_STATUS) & 1); //wait busy
 		__raw_writel((__raw_readl(hw->regs + REG_CTL) & ~0x700000), hw->regs + REG_CTL);//Restore to single mode, direction input
 
 
@@ -397,6 +398,7 @@ static int nuc980_qspi0_txrx(struct spi_device *spi, struct spi_transfer *t)
 #if 0 //QUAD + byte reorder issue
 		while (__raw_readl(hw->regs + REG_STATUS) & 1); //wait busy
 #else
+		while (__raw_readl(hw->regs + REG_STATUS) & 1); //wait busy
 		__raw_writel((__raw_readl(hw->regs + REG_CTL) & ~SPIEN), hw->regs + REG_CTL); //Disable SPIEN
 		__raw_writel(__raw_readl(hw->regs + REG_PDMACTL)&~(0x3), hw->regs + REG_PDMACTL); //Disable SPIx TX/RX PDMA
 		__raw_writel(__raw_readl(hw->regs + REG_FIFOCTL) | 0x3, hw->regs + REG_FIFOCTL); //RXRST & TXRST
@@ -452,6 +454,7 @@ static int nuc980_qspi0_txrx(struct spi_device *spi, struct spi_transfer *t)
 		}
 	}
 
+	while (__raw_readl(hw->regs + REG_STATUS) & 1); //wait busy
 	__raw_writel((__raw_readl(hw->regs + REG_CTL) & ~0x700000), hw->regs + REG_CTL);//Restore to single mode, direction input
 #endif
 
