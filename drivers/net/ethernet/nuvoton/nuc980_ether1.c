@@ -1338,9 +1338,6 @@ static int nuc980_ether_open(struct net_device *netdev)
                 ether->speed = SPEED_100;
                 nuc980_opmode(netdev, ether->speed, ether->duplex);
 
-		/* If using NC-SI subsystem, set our carrier on and start the stack */
-		netif_carrier_on(netdev);
-
 		/* Start the NC-SI device */
 		err = ncsi_start_dev(ether->ncsidev);
 		if (err)
@@ -1481,12 +1478,12 @@ static int nuc980_get_ts_info(struct net_device *netdev, struct ethtool_ts_info 
 
 static int nuc980_change_mtu(struct net_device *netdev, int new_mtu)
 {
-	if(new_mtu < 64 || new_mtu > 2048)
+	if(new_mtu < 64 || new_mtu > MAX_PACKET_SIZE)
 		return -EINVAL;
 
 	netdev->mtu = new_mtu;
 
-	if(new_mtu < 1500)
+	if(new_mtu < 1518)
 		nuc980_set_alp(netdev, false);
 	else
 		nuc980_set_alp(netdev, true);
@@ -1629,6 +1626,11 @@ static void nuc980_ncsi_handler(struct ncsi_dev *ncsidev)
 {
 	if (unlikely(ncsidev->state != ncsi_dev_state_functional))
 		return;
+
+	if ( ncsidev->link_up )
+		test_and_clear_bit(__LINK_STATE_NOCARRIER, &ncsidev->dev->state);
+	else
+		test_and_set_bit(__LINK_STATE_NOCARRIER, &ncsidev->dev->state);
 
 	netdev_info(ncsidev->dev, "NCSI interface %s\n",
 		    ncsidev->link_up ? "up" : "down");
@@ -1861,8 +1863,6 @@ static int nuc980_ether_resume(struct platform_device *pdev)
 		} else {
 			if (ether->phy_dev)
 				phy_start(ether->phy_dev);
-			else if (ether->use_ncsi)
-				netif_carrier_on(netdev);
 		}
 
 		napi_enable(&ether->napi);

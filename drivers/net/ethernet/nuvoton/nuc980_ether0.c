@@ -1338,9 +1338,6 @@ static int nuc980_ether_open(struct net_device *netdev)
                 ether->speed = SPEED_100;
                 nuc980_opmode(netdev, ether->speed, ether->duplex);
 
-		/* If using NC-SI subsystem, set our carrier on and start the stack */
-		netif_carrier_on(netdev);
-
 		/* Start the NC-SI device */
 		err = ncsi_start_dev(ether->ncsidev);
 		if (err)
@@ -1630,6 +1627,11 @@ static void nuc980_ncsi_handler(struct ncsi_dev *ncsidev)
 	if (unlikely(ncsidev->state != ncsi_dev_state_functional))
 		return;
 
+	if ( ncsidev->link_up )
+		test_and_clear_bit(__LINK_STATE_NOCARRIER, &ncsidev->dev->state);
+	else
+		test_and_set_bit(__LINK_STATE_NOCARRIER, &ncsidev->dev->state);
+
 	netdev_info(ncsidev->dev, "NCSI interface %s\n",
 		    ncsidev->link_up ? "up" : "down");
 }
@@ -1861,8 +1863,6 @@ static int nuc980_ether_resume(struct platform_device *pdev)
 		} else {
 			if (ether->phy_dev)
 				phy_start(ether->phy_dev);
-			else if (ether->use_ncsi)
-				netif_carrier_on(netdev);
 		}
 
 		napi_enable(&ether->napi);

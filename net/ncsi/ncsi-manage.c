@@ -689,8 +689,6 @@ static int set_one_vid(struct ncsi_dev_priv *ndp, struct ncsi_channel *nc,
 	return 0;
 }
 
-#if IS_ENABLED(CONFIG_NCSI_OEM_CMD_KEEP_PHY)
-
 static int ncsi_oem_keep_phy_intel(struct ncsi_cmd_arg *nca)
 {
 	unsigned char data[NCSI_OEM_INTEL_CMD_KEEP_PHY_LEN];
@@ -716,10 +714,6 @@ static int ncsi_oem_keep_phy_intel(struct ncsi_cmd_arg *nca)
 	return ret;
 }
 
-#endif
-
-#if IS_ENABLED(CONFIG_NCSI_OEM_CMD_INTEL_OS2BMC)
-
 static int ncsi_oem_enable_os2bmc_intel(struct ncsi_cmd_arg *nca)
 {
 	unsigned char data[NCSI_OEM_INTEL_CMD_OS2BMC_LEN];
@@ -743,11 +737,6 @@ static int ncsi_oem_enable_os2bmc_intel(struct ncsi_cmd_arg *nca)
 			   nca->type);
 	return ret;
 }
-
-#endif
-
-
-#if IS_ENABLED(CONFIG_NCSI_OEM_CMD_GET_MAC)
 
 /* NCSI OEM Command APIs */
 static int ncsi_oem_gma_handler_bcm(struct ncsi_cmd_arg *nca)
@@ -884,8 +873,6 @@ static int ncsi_gma_handler(struct ncsi_cmd_arg *nca, unsigned int mf_id)
 	/* Get Mac address from NCSI device */
 	return nch->handler(nca);
 }
-
-#endif /* CONFIG_NCSI_OEM_CMD_GET_MAC */
 
 /* Determine if a given channel from the channel_queue should be used for Tx */
 static bool ncsi_channel_is_tx(struct ncsi_dev_priv *ndp,
@@ -1082,20 +1069,23 @@ static void ncsi_configure_channel(struct ncsi_dev_priv *ndp)
 			goto error;
 #endif /* CONFIG_NCSI_OEM_CMD_INTEL_OS2BMC */
 
-		nd->state = ncsi_dev_state_config_oem_gma;
+		nd->state = IS_ENABLED(CONFIG_NCSI_OEM_CMD_GET_MAC)
+			  ? ncsi_dev_state_config_oem_gma
+			  : ncsi_dev_state_config_clear_vids;
 		break;
 	case ncsi_dev_state_config_oem_gma:
 		nd->state = ncsi_dev_state_config_clear_vids;
-		ret = -1;
 
-#if IS_ENABLED(CONFIG_NCSI_OEM_CMD_GET_MAC)
-		nca.type = NCSI_PKT_CMD_OEM;
 		nca.package = np->id;
 		nca.channel = nc->id;
 		ndp->pending_req_num = 1;
-		ret = ncsi_gma_handler(&nca, nc->version.mf_id);
-#endif /* CONFIG_NCSI_OEM_CMD_GET_MAC */
-
+		if (nc->version.major >= 1 && nc->version.minor >= 2) {
+			nca.type = NCSI_PKT_CMD_GMCMA;
+			ret = ncsi_xmit_cmd(&nca);
+		} else {
+			nca.type = NCSI_PKT_CMD_OEM;
+			ret = ncsi_gma_handler(&nca, nc->version.mf_id);
+		}
 		if (ret < 0)
 			schedule_work(&ndp->work);
 
@@ -1105,6 +1095,7 @@ static void ncsi_configure_channel(struct ncsi_dev_priv *ndp)
 	case ncsi_dev_state_config_ev:
 	case ncsi_dev_state_config_sma:
 	case ncsi_dev_state_config_ebf:
+	case ncsi_dev_state_config_dbf:
 	case ncsi_dev_state_config_dgmf:
 	case ncsi_dev_state_config_ecnt:
 	case ncsi_dev_state_config_ec:
@@ -1154,10 +1145,17 @@ static void ncsi_configure_channel(struct ncsi_dev_priv *ndp)
 				nca.bytes[index] = dev->dev_addr[index];
 			nca.bytes[6] = 0x1;
 			nca.bytes[7] = 0x1;
+#if IS_ENABLED(CONFIG_NCSI_OEM_CMD_DBF)
+			nd->state = ncsi_dev_state_config_dbf;
+		} else if (nd->state == ncsi_dev_state_config_dbf) {
+			nca.type = NCSI_PKT_CMD_DBF;
+			nca.dwords[0] = 0;
+#else
 			nd->state = ncsi_dev_state_config_ebf;
 		} else if (nd->state == ncsi_dev_state_config_ebf) {
 			nca.type = NCSI_PKT_CMD_EBF;
 			nca.dwords[0] = nc->caps[NCSI_CAP_BC].cap;
+#endif
 			/* if multicast global filtering is supported then
 			 * disable it so that all multicast packet will be
 			 * forwarded to management controller
@@ -1391,6 +1389,7 @@ static bool ncsi_check_hwa(struct ncsi_dev_priv *ndp)
 
 static void ncsi_probe_channel(struct ncsi_dev_priv *ndp)
 {
+#define DEF_PROBED_PACKAGE_NUM   1
 	struct ncsi_dev *nd = &ndp->ndev;
 	struct ncsi_package *np;
 	struct ncsi_channel *nc;
@@ -1405,12 +1404,12 @@ static void ncsi_probe_channel(struct ncsi_dev_priv *ndp)
 		nd->state = ncsi_dev_state_probe_deselect;
 		fallthrough;
 	case ncsi_dev_state_probe_deselect:
-		ndp->pending_req_num = 8;
+		ndp->pending_req_num = DEF_PROBED_PACKAGE_NUM;
 
 		/* Deselect all possible packages */
 		nca.type = NCSI_PKT_CMD_DP;
 		nca.channel = NCSI_RESERVED_CHANNEL;
-		for (index = 0; index < 8; index++) {
+		for (index = 0; index < DEF_PROBED_PACKAGE_NUM; index++) {
 			nca.package = index;
 			ret = ncsi_xmit_cmd(&nca);
 			if (ret)
@@ -1447,7 +1446,6 @@ static void ncsi_probe_channel(struct ncsi_dev_priv *ndp)
 
 		schedule_work(&ndp->work);
 		break;
-#if IS_ENABLED(CONFIG_NCSI_OEM_CMD_GET_MAC)
 	case ncsi_dev_state_probe_mlx_gma:
 		ndp->pending_req_num = 1;
 
@@ -1472,7 +1470,6 @@ static void ncsi_probe_channel(struct ncsi_dev_priv *ndp)
 
 		nd->state = ncsi_dev_state_probe_cis;
 		break;
-#endif /* CONFIG_NCSI_OEM_CMD_GET_MAC */
 	case ncsi_dev_state_probe_cis:
 		ndp->pending_req_num = NCSI_RESERVED_CHANNEL;
 
@@ -1490,7 +1487,6 @@ static void ncsi_probe_channel(struct ncsi_dev_priv *ndp)
 		if (IS_ENABLED(CONFIG_NCSI_OEM_CMD_KEEP_PHY))
 			nd->state = ncsi_dev_state_probe_keep_phy;
 		break;
-#if IS_ENABLED(CONFIG_NCSI_OEM_CMD_KEEP_PHY)
 	case ncsi_dev_state_probe_keep_phy:
 		ndp->pending_req_num = 1;
 
@@ -1503,7 +1499,6 @@ static void ncsi_probe_channel(struct ncsi_dev_priv *ndp)
 
 		nd->state = ncsi_dev_state_probe_gvi;
 		break;
-#endif /* CONFIG_NCSI_OEM_CMD_KEEP_PHY */
 	case ncsi_dev_state_probe_gvi:
 	case ncsi_dev_state_probe_gc:
 	case ncsi_dev_state_probe_gls:
@@ -1546,7 +1541,7 @@ static void ncsi_probe_channel(struct ncsi_dev_priv *ndp)
 
 		/* Probe next package */
 		ndp->package_probe_id++;
-		if (ndp->package_probe_id >= 8) {
+		if (ndp->package_probe_id >= DEF_PROBED_PACKAGE_NUM /* Wayne: For speed-up probing. */) {
 			/* Probe finished */
 			ndp->flags |= NCSI_DEV_PROBED;
 			break;
@@ -1894,10 +1889,13 @@ void ncsi_stop_dev(struct ncsi_dev *nd)
 			spin_lock_irqsave(&nc->lock, flags);
 			chained = !list_empty(&nc->link);
 			old_state = nc->state;
+			/* Clear State, back to un-probe. */
+			ndp->flags = 0;
 			spin_unlock_irqrestore(&nc->lock, flags);
 
-			WARN_ON_ONCE(chained ||
-				     old_state == NCSI_CHANNEL_INVISIBLE);
+			/* Be silence */
+			//WARN_ON_ONCE(chained ||
+			//	     old_state == NCSI_CHANNEL_INVISIBLE);
 		}
 	}
 
