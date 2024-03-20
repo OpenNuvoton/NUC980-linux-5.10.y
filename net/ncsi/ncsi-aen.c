@@ -86,8 +86,19 @@ static int ncsi_aen_handler_lsc(struct ncsi_dev_priv *ndp,
 			    "NCSI: Inactive channel %u received AEN!\n",
 			    nc->id);
 
+	printk("NCSI: LSC AEN - channel#%u state %s. (had_link %d, has_link %d)\n",
+		   nc->id, 
+		   data & 0x1 ? "up" : "down",
+		   had_link,
+		   has_link);
+
 	if ((had_link == has_link) || chained)
 		return 0;
+
+	if ( had_link )
+		netif_carrier_off(ndp->ndev.dev);
+	else
+		netif_carrier_on(ndp->ndev.dev);
 
 	if (!ndp->multi_package && !nc->package->multi_channel) {
 		if (had_link) {
@@ -165,6 +176,7 @@ static int ncsi_aen_handler_cr(struct ncsi_dev_priv *ndp,
 	nc->state = NCSI_CHANNEL_INACTIVE;
 	list_add_tail_rcu(&nc->link, &ndp->channel_queue);
 	spin_unlock_irqrestore(&ndp->lock, flags);
+	nc->modes[NCSI_MODE_TX_ENABLE].enable = 0;
 
 	return ncsi_process_next_channel(ndp);
 }

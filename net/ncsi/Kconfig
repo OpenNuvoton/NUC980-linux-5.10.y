@@ -29,3 +29,9 @@ config NCSI_OEM_CMD_INTEL_OS2BMC
 	help
 	  This allows network traffic between host and sideband, specific to
 	  Intel network controllers.
+
+config NCSI_OEM_CMD_DBF
+	bool "Disable broadcast filtering function"
+	depends on NET_NCSI
+	help
+	  This allows broadcasting traffic between the same subnet hosts and sideband.
