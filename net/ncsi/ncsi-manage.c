@@ -1389,7 +1389,7 @@ static bool ncsi_check_hwa(struct ncsi_dev_priv *ndp)
 
 static void ncsi_probe_channel(struct ncsi_dev_priv *ndp)
 {
-#define DEF_PROBED_PACKAGE_NUM   1
+#define DEF_PROBED_PACKAGE_NUM   2
 	struct ncsi_dev *nd = &ndp->ndev;
 	struct ncsi_package *np;
 	struct ncsi_channel *nc;
