@@ -364,7 +364,7 @@ static void nuc980_prepare_RX_dma(struct uart_nuc980_port *p)
 		// use DDR
 #ifndef USING_SRAM
 		//p->dest_mem_p.size = 256;
-		p->dest_mem_p.size = 4096*2;
+		p->dest_mem_p.size = UART_RX_BUF_SIZE*2;
 		p->dest_mem_p.vir_addr = (unsigned int)kmalloc((UART_RX_BUF_SIZE * 2), GFP_KERNEL);
 		p->dest_mem_p.phy_addr = dma_map_single(pdma_rx->chan_rx->device->dev, (void *)p->dest_mem_p.vir_addr, (UART_RX_BUF_SIZE * 2), DMA_FROM_DEVICE);
                 ret = dma_mapping_error(pdma_rx->chan_rx->device->dev, p->dest_mem_p.phy_addr);
