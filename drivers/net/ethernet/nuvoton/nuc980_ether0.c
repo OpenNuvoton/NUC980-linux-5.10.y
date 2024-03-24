@@ -1338,6 +1338,8 @@ static int nuc980_ether_open(struct net_device *netdev)
                 ether->speed = SPEED_100;
                 nuc980_opmode(netdev, ether->speed, ether->duplex);
 
+		netif_carrier_on(netdev);
+
 		/* Start the NC-SI device */
 		err = ncsi_start_dev(ether->ncsidev);
 		if (err)
