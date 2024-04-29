@@ -255,7 +255,7 @@ static int write_fifo(struct nuc980_ep *ep, struct nuc980_request *req)
 	len = write_packet(ep, req);
 
 	/* last packet is often short (sometimes a zlp) */
-	if (req->req.length == req->req.actual/* && !req->req.zero*/)
+	if (((req->req.length == req->req.actual) && (len % ep->ep.maxpacket)) || (len == 0))
 	{
 		done(ep, req, 0);
 		return 1;
