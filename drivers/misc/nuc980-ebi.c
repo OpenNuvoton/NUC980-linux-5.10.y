@@ -180,7 +180,6 @@ static int ebi_mmap(struct file *filp, struct vm_area_struct * vma)
 static int nuc980_ebi_probe(struct platform_device *pdev)
 {
 	struct ebi_dev *nuc980_ebi;
-	unsigned int ch;
 	ENTRY();
 
 	dev_info(&pdev->dev, "NUC980 EBI\n");

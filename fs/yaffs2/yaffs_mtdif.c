@@ -252,6 +252,7 @@ void yaffs_mtd_drv_install(struct yaffs_dev *dev)
 	drv->drv_deinitialise_fn = yaffs_mtd_deinitialise;
 }
 
+#if 0 // not used; 2024-06-11 by Jacky Huang
 struct mtd_info * yaffs_get_mtd_device(dev_t sdev)
 {
 	struct mtd_info *mtd;
@@ -281,6 +282,7 @@ struct mtd_info * yaffs_get_mtd_device(dev_t sdev)
 
 	return mtd;
 }
+#endif
 
 int yaffs_verify_mtd(struct mtd_info *mtd, int yaffs_version, int inband_tags)
 {
