@@ -123,7 +123,7 @@ static void qspi0_nuc980_slave_dma_callback(void *arg)
 
 	done->done = true;
 	qspi0_slave_done_state = 1;
-	//wake_up_interruptible(&qspi0_slave_done);
+	wake_up_interruptible(&qspi0_slave_done);
 
 	return;
 }
@@ -310,6 +310,7 @@ static int nuc980_qspi0_txrx(struct spi_device *spi, struct spi_transfer *t)
 
 
 	} else {
+		long ret;
 
 		if (t->rx_buf) {
 			if(t->rx_nbits & SPI_NBITS_QUAD) {
@@ -428,8 +429,13 @@ static int nuc980_qspi0_txrx(struct spi_device *spi, struct spi_transfer *t)
 		else
 			__raw_writel(__raw_readl(hw->regs + REG_PDMACTL)|(0x1), hw->regs + REG_PDMACTL); //Enable SPIx TX PDMA
 
-		//wait_event_interruptible(qspi0_slave_done, (qspi0_slave_done_state != 0));
-		while (qspi0_slave_done_state == 0);
+		ret = wait_event_interruptible_timeout(qspi0_slave_done,
+							qspi0_slave_done_state != 0,
+							msecs_to_jiffies(SPI_GENERAL_TIMEOUT_MS));
+		if ((ret == 0) && (qspi0_slave_done_state == 0)) {
+			printk("%s: wait PDMA transfer done timeout\n", __func__);
+			return 0;
+		}
 
 		qspi0_slave_done_state=0;
 
@@ -491,10 +497,15 @@ static int nuc980_qspi0_txrx(struct spi_device *spi, struct spi_transfer *t)
 				j++;
 			}
 		}
+		end = jiffies + msecs_to_jiffies(SPI_GENERAL_TIMEOUT_MS);
 		while (j < t->len) {
 			if (((__raw_readl(hw->regs + REG_STATUS) & 0x100) == 0x000)) { //RX NOT EMPTY
 				hw_rx(hw, __raw_readl(hw->regs + REG_RX), j);
 				j++;
+			}
+			if (time_after(jiffies, end)) {
+				printk("SPI RX timeout: %d\n", __LINE__);
+				return 0;
 			}
 		}
 	} else {
