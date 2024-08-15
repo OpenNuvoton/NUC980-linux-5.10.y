@@ -397,6 +397,7 @@ int ncsi_xmit_cmd(struct ncsi_cmd_arg *nca)
 
 	/* Send NCSI packet */
 	skb_get(nr->cmd);
+	//Wayne skb_dump(KERN_WARNING, nr->cmd, false);
 	ret = dev_queue_xmit(nr->cmd);
 	if (ret < 0) {
 		ncsi_free_request(nr);

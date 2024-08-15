@@ -692,7 +692,6 @@ static int ncsi_rsp_handler_oem_bcm(struct ncsi_request *nr)
 
 	if (bcm->type == NCSI_OEM_BCM_CMD_GMA)
 		return ncsi_rsp_handler_oem_gma(nr, NCSI_OEM_MFR_BCM_ID);
-
 	return 0;
 }
 
@@ -796,12 +795,13 @@ static int ncsi_rsp_handler_gc(struct ncsi_request *nr)
 	struct ncsi_rsp_gc_pkt *rsp;
 	struct ncsi_dev_priv *ndp = nr->ndp;
 	struct ncsi_channel *nc;
+	struct ncsi_package *np;
 	size_t size;
 
 	/* Find the channel */
 	rsp = (struct ncsi_rsp_gc_pkt *)skb_network_header(nr->rsp);
 	ncsi_find_package_and_channel(ndp, rsp->rsp.common.channel,
-				      NULL, &nc);
+				      &np, &nc);
 	if (!nc)
 		return -ENODEV;
 
@@ -836,6 +836,7 @@ static int ncsi_rsp_handler_gc(struct ncsi_request *nr)
 	 */
 	nc->vlan_filter.bitmap = U64_MAX;
 	nc->vlan_filter.n_vids = rsp->vlan_cnt;
+	np->ndp->channel_count = rsp->channel_cnt;
 
 	return 0;
 }
@@ -1186,6 +1187,8 @@ int ncsi_rcv_rsp(struct sk_buff *skb, struct net_device *dev,
 	ndp = nd ? TO_NCSI_DEV_PRIV(nd) : NULL;
 	if (!ndp)
 		return -ENODEV;
+
+	//Wayne skb_dump(KERN_WARNING, skb, false);
 
 	/* Check if it is AEN packet */
 	hdr = (struct ncsi_pkt_hdr *)skb_network_header(skb);
