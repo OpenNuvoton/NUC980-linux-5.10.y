@@ -274,6 +274,11 @@ static rx_handler_result_t br_handle_frame(struct sk_buff **pskb)
 	if (unlikely(skb->pkt_type == PACKET_LOOPBACK))
 		return RX_HANDLER_PASS;
 
+#ifdef CONFIG_NET_NCSI
+	if (unlikely(skb->protocol == cpu_to_be16(ETH_P_NCSI)))
+		return RX_HANDLER_PASS;	
+#endif
+
 	if (!is_valid_ether_addr(eth_hdr(skb)->h_source))
 		goto drop;
 
