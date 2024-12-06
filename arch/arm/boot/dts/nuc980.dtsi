@@ -569,6 +569,11 @@
 						<6 0xa 4 0
 						 0 0xf 4 0>;
 				};
+				pinctrl_lite4_PB13_PF6: lite4-PB13-PF6 {
+					nuvoton,pins =
+						<1 0xd 6 0
+						 5 6 6 0>;
+				};
 			};
 
 			usbh-lite5 {
@@ -772,7 +777,7 @@
 						 //3 0x0 0x4 0   /* eint2_D0 */
 						 //4 0xA 0x5 0	 /* eint2_E10 */
 						 //1 0x3 0x3 0	 /* eint2_B3 */
-						 1 0xD 0x2 0	 /* eint2_B13 */
+						 //1 0xD 0x2 0	 /* eint2_B13 */
 
 						 //3 0x1 0x4 0   /* eint3_D1 */
 						 //4 0xC 0x5 0	 /* eint3_E12 */
@@ -1794,7 +1799,7 @@
 			reg = <0xb0017000 0x1000>;
 			interrupts = <24 4 1>;
 			pinctrl-names = "default";
-			pinctrl-0 = <&pinctrl_lite0_PB10_PB9>;
+			pinctrl-0 = <&pinctrl_lite0_PB5_PB7>;
 			status = "disabled";
 		};
 
@@ -1803,7 +1808,7 @@
 			reg = <0xb0017000 0x1000>;
 			interrupts = <24 4 1>;
 			pinctrl-names = "default";
-			pinctrl-0 = <&pinctrl_lite1_PE1_PE0>;
+			pinctrl-0 = <&pinctrl_lite1_PF1_PF0>;
 			status = "disabled";
 		};
 
@@ -1812,7 +1817,7 @@
 			reg = <0xb0017000 0x1000>;
 			interrupts = <24 4 1>;
 			pinctrl-names = "default";
-			pinctrl-0 = <&pinctrl_lite2_PE3_PE2>;
+			pinctrl-0 = <&pinctrl_lite2_PF3_PF2>;
 			status = "disabled";
 		};
 
@@ -1821,7 +1826,7 @@
 			reg = <0xb0017000 0x1000>;
 			interrupts = <24 4 1>;
 			pinctrl-names = "default";
-			pinctrl-0 = <&pinctrl_lite3_PE5_PE4>;
+			pinctrl-0 = <&pinctrl_lite3_PF5_PF4>;
 			status = "disabled";
 		};
 
@@ -1830,7 +1835,7 @@
 			reg = <0xb0017000 0x1000>;
 			interrupts = <24 4 1>;
 			pinctrl-names = "default";
-			pinctrl-0 = <&pinctrl_lite4_PE7_PE6>;
+			pinctrl-0 = <&pinctrl_lite4_PB13_PF6>;
 			status = "disabled";
 		};
 
@@ -1839,7 +1844,7 @@
 			reg = <0xb0017000 0x1000>;
 			interrupts = <24 4 1>;
 			pinctrl-names = "default";
-			pinctrl-0 = <&pinctrl_lite5_PE9_PE8>;
+			pinctrl-0 = <&pinctrl_lite5_PF9_PF8>;
 			status = "disabled";
 		};
 
