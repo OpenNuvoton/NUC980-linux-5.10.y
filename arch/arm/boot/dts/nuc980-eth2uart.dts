@@ -151,15 +151,15 @@
 					label = "u-boot";
 					reg = <0x00000000 0x00200000>;
 				};
-				partition@200000 {
+				partition@1 {
 					label = "kernel";
 					reg = <0x00200000 0x01600000>;
 				};
-				partition@1800000 {
+				partition@2 {
 					label = "lighttpd";
 					reg = <0x01800000 0x01800000>;
 				};
-				partition@3000000 {
+				partition@3 {
 					label = "user";
 					reg = <0x03000000 0x05000000>;
 				};
@@ -259,6 +259,30 @@
 
 		usbdev@b0016000 {
 			status = "disabled";
+		};
+
+		fmi@b0019000 {
+			compatible = "nuvoton,nuc980-fmi", "nand";
+			pinctrl-names = "default";
+			pinctrl-0 = <&pinctrl_nand>;
+			status = "disabled";
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			partition@0x0 {
+				label = "u-boot";
+				reg = <0x00000000 0x0200000>;
+			};
+
+			partition@0x200000 {
+				label = "Kernel";
+				reg = <0x0200000 0x1400000>;
+			};
+
+			partition@0x1600000 {
+				label = "user";
+				reg = <0x1600000 0x6480000>;
+			};
 		};
 
 		sdh@b0018000 {
