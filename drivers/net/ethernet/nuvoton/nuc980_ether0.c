@@ -1799,9 +1799,6 @@ static int nuc980_ether_remove(struct platform_device *pdev)
 	clk_disable(ether->eclk);
 	clk_put(ether->eclk);
 
-	free_irq(ether->txirq, netdev);
-	free_irq(ether->rxirq, netdev);
-
 	if (ether->phy_dev)
 		phy_disconnect(ether->phy_dev);
 
