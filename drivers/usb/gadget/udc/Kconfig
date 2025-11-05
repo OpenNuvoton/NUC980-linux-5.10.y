@@ -224,6 +224,20 @@ config USB_NUC980
 	help
 	  On-chip USB Device Controller of Nuvoton NUC980.
 
+if USB_NUC980
+
+config USBD_PM_PHY_OFF
+    bool "Turn off USB PHY during suspend to save power"
+    default y
+    help
+      When the system enters suspend (sleep/deep sleep), the USB PHY
+      will be turned off to reduce power consumption.
+
+      If set to No, the USB PHY remains powered during suspend.
+
+
+endif # USB_NUC980
+
 config USB_S3C2410
 	tristate "S3C2410 USB Device Controller"
 	depends on ARCH_S3C24XX

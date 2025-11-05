@@ -25,7 +25,7 @@
 #include <linux/prefetch.h>
 #include <linux/usb/ch9.h>
 #include <linux/of.h>
-
+#include <linux/gpio.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/delay.h>
@@ -49,6 +49,7 @@
 #include <mach/regs-gcr.h>
 #include <mach/regs-clock.h>
 #include <mach/regs-gpio.h>
+#include <mach/gpio.h>
 #include "nuc980_udc.h"
 
 //#define pr_devel printk
@@ -1722,27 +1723,32 @@ static int nuc980_udc_remove(struct platform_device *pdev)
 	return 0;
 }
 
-#ifdef CONFIG_PM
-static int nuc980_udc_suspend (struct platform_device *pdev, pm_message_t state)
+#if defined(CONFIG_PM) && defined(CONFIG_USBD_PM_PHY_OFF)
+static int nuc980_udc_suspend(struct platform_device *pdev, pm_message_t state)
 {
 	struct nuc980_udc *udc = platform_get_drvdata (pdev);
-	__raw_writel(__raw_readl(udc->base + REG_USBD_PHYCTL) & ~0x200, udc->base + REG_USBD_PHYCTL);    // phy suspend
+	int vbus = gpio_get_value(NUC980_PE11);
+	if (vbus)
+		__raw_writel(__raw_readl(udc->base + REG_USBD_PHYCTL) & ~0x200, udc->base + REG_USBD_PHYCTL);    // phy suspend
 	return 0;
 }
 
 static int nuc980_udc_resume (struct platform_device *pdev)
 {
 	struct nuc980_udc *udc = platform_get_drvdata (pdev);
-	unsigned int reg = __raw_readl(udc->base + REG_USBD_EPA_EPMPS);
-
-	__raw_writel(__raw_readl(udc->base + REG_USBD_PHYCTL) | 0x200, udc->base + REG_USBD_PHYCTL);
-	while (1)
+	int vbus = gpio_get_value(NUC980_PE11);
+	if (vbus)
 	{
-		__raw_writel(0x20, udc->base + REG_USBD_EPA_EPMPS);
-		if (__raw_readl(udc->base + REG_USBD_EPA_EPMPS) == 0x20)
+		unsigned int reg = __raw_readl(udc->base + REG_USBD_EPA_EPMPS);
+		__raw_writel(__raw_readl(udc->base + REG_USBD_PHYCTL) | 0x200, udc->base + REG_USBD_PHYCTL);
+		while (1)
 		{
-			__raw_writel(reg, udc->base + REG_USBD_EPA_EPMPS);
-			break;
+			__raw_writel(0x20, udc->base + REG_USBD_EPA_EPMPS);
+			if (__raw_readl(udc->base + REG_USBD_EPA_EPMPS) == 0x20)
+			{
+				__raw_writel(reg, udc->base + REG_USBD_EPA_EPMPS);
+				break;
+			}
 		}
 	}
 
