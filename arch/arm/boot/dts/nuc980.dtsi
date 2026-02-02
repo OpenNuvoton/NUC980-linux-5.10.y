@@ -1314,6 +1314,7 @@
 			map-addr = <0xf0078000>;
 			pinctrl-names = "default";
 			pinctrl-0 = <&pinctrl_uart8_PA_PG>;
+			pdma-enable = <0>;
 			status = "disabled";
 		};
 
