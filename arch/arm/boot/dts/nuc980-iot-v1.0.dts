@@ -210,7 +210,8 @@
 
 			nau8822: nau8822@1a {
 				compatible = "nuvoton,nau8822";
-				reg = <0x1a> ;
+				reg = <0x1a>;
+				nuvoton,spk-btl;
 			};
 		};
 
