@@ -104,10 +104,10 @@ static void __init nuc980_init_late(void)
 	nuc980_init_suspend();
 }
 
-static void __init nuc980_reserve_memory(void)
+void __init nuc980_reserve_memory(void)
 {
-	if(memblock_reserve(0, 1024) < 0)
-		printk("Failed to reserve memory 0x0~0x400\n");
+	if(memblock_reserve(0, PAGE_SIZE) < 0)
+		printk("Failed to reserve memory page at physical address 0\n");
 }
 
 MACHINE_START(NUC980, "NUC980")
