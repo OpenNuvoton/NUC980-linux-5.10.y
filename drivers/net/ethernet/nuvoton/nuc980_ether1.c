@@ -318,7 +318,7 @@ static int nuc980_adjust_freq(struct ptp_clock_info *ptp, s32 ppb)
 	
 	spin_lock_irqsave(&priv->ptp_lock, flags);
 	nuc980_config_addend(addend);
-	spin_unlock_irqrestore(&priv->lock, flags);
+	spin_unlock_irqrestore(&priv->ptp_lock, flags);
 
 	return 0;
 }
@@ -350,7 +350,7 @@ static int nuc980_adjust_time(struct ptp_clock_info *ptp, s64 delta)
 	}
 	__raw_readl(REG_TSSUBSEC); // read subsec to update sec
 
-	spin_unlock_irqrestore(&priv->lock, flags);
+	spin_unlock_irqrestore(&priv->ptp_lock, flags);
 
 	return 0;
 }
