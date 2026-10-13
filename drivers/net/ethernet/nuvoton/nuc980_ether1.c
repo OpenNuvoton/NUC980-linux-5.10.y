@@ -219,6 +219,7 @@ struct  nuc980_ether {
 	struct clk *clk;
 	struct clk *eclk;
 	struct device_node *phy_dn;
+	phy_interface_t phy_mode;
 	unsigned int msg_enable;
 	struct mii_bus *mii_bus;
 	struct phy_device *phy_dev;
@@ -795,16 +796,17 @@ static int nuc980_init_desc(struct net_device *netdev)
 		rxbd_next[i] = rdesc->next; // backup
 		rdesc->sl = RX_OWEN_DMA;
 		if(get_new_skb(netdev, i) == NULL) {
+			/* unwind buffers 0..i-1 before the descriptors go away */
+			while (i--) {
+				dma_unmap_single(&pdev->dev, (dma_addr_t)((ether->rdesc + i)->buffer),
+							MAX_PACKET_SIZE, DMA_FROM_DEVICE);
+				dev_kfree_skb_any(rx_skb[i]);
+				rx_skb[i] = NULL;
+			}
 			dma_free_coherent(&pdev->dev, sizeof(struct nuc980_txbd) * TX_DESC_SIZE,
 						ether->tdesc, ether->tdesc_phys);
 			dma_free_coherent(&pdev->dev, sizeof(struct nuc980_rxbd) * RX_DESC_SIZE,
 						ether->rdesc, ether->rdesc_phys);
-
-			for(; i != 0; i--) {
-				dma_unmap_single(&netdev->dev, (dma_addr_t)((ether->rdesc + i)->buffer),
-							MAX_PACKET_SIZE, DMA_FROM_DEVICE);
-				dev_kfree_skb_any(rx_skb[i]);
-			}
 			return -ENOMEM;
 		}
 	}
@@ -1541,78 +1543,83 @@ static void __init get_mac_address(struct net_device *netdev)
 static int nuc980_mii_setup(struct net_device *netdev)
 {
 	struct nuc980_ether *ether = netdev_priv(netdev);
-	struct platform_device *pdev;
+	struct platform_device *pdev = ether->pdev;
+	struct device_node *np = pdev->dev.of_node;
+	struct device_node *mdio_np = of_get_child_by_name(np, "mdio");
 	struct phy_device *phydev;
 	int i, err = 0;
 
-	pdev = ether->pdev;
+	/* register our MDIO bus unless the PHY sits on another MAC's bus */
+	if (mdio_np || !ether->phy_dn) {
+		ether->mii_bus = mdiobus_alloc();
+		if (!ether->mii_bus) {
+			err = -ENOMEM;
+			goto out_put;
+		}
+
+		ether->mii_bus->name = "nuc980_rmii1";
+		ether->mii_bus->read = &nuc980_mdio_read;
+		ether->mii_bus->write = &nuc980_mdio_write;
+		ether->mii_bus->reset = &nuc980_mdio_reset;
+		snprintf(ether->mii_bus->id, MII_BUS_ID_SIZE, "%s",
+			 dev_name(&pdev->dev));
+		ether->mii_bus->priv = ether;
+		ether->mii_bus->parent = &pdev->dev;
+
+		for (i = 0; i < PHY_MAX_ADDR; i++)
+			ether->mii_bus->irq[i] = PHY_POLL;
+
+		/* np == NULL (non-DT) falls back to a plain bus scan */
+		err = of_mdiobus_register(ether->mii_bus, mdio_np);
+		if (err) {
+			dev_err(&pdev->dev, "mdiobus_register() failed\n");
+			mdiobus_free(ether->mii_bus);
+			ether->mii_bus = NULL;
+			goto out_put;
+		}
+	}
 
 	if (ether->phy_dn) {
-		ether->phy_dev = of_phy_connect(netdev, ether->phy_dn,
-					&adjust_link, 0, 0);
-		if (!ether->phy_dn) {
-			dev_err(&netdev->dev, "could not connect to phy %pOF\n",
-				ether->phy_dn);
-			return -ENODEV;
+		phydev = of_phy_connect(netdev, ether->phy_dn, &adjust_link,
+					0, ether->phy_mode);
+		if (!phydev) {
+			/* PHY's bus may not be registered yet */
+			err = -EPROBE_DEFER;
+			goto out_bus;
 		}
-		return 0;
+	} else {
+		phydev = phy_find_first(ether->mii_bus);
+		if (!phydev) {
+			err = -ENODEV;
+			dev_err(&pdev->dev, "phy_find_first() failed\n");
+			goto out_bus;
+		}
+		phydev = phy_connect(netdev, phydev_name(phydev),
+				     &adjust_link, ether->phy_mode);
+		if (IS_ERR(phydev)) {
+			err = PTR_ERR(phydev);
+			dev_err(&pdev->dev, "phy_connect() failed\n");
+			goto out_bus;
+		}
 	}
 
-	ether->mii_bus = mdiobus_alloc();
-	if (!ether->mii_bus) {
-		err = -ENOMEM;
-		dev_err(&pdev->dev, "mdiobus_alloc() failed\n");
-		goto out0;
-	}
-
-	ether->mii_bus->name = "nuc980_rmii1";
-	ether->mii_bus->read = &nuc980_mdio_read;
-	ether->mii_bus->write = &nuc980_mdio_write;
-	ether->mii_bus->reset = &nuc980_mdio_reset;
-	snprintf(ether->mii_bus->id, MII_BUS_ID_SIZE, "%s-%x",
-		 ether->pdev->name, ether->pdev->id);
-	ether->mii_bus->priv = ether;
-	ether->mii_bus->parent = &ether->pdev->dev;
-
-	for (i = 0; i < PHY_MAX_ADDR; i++)
-		ether->mii_bus->irq[i] = PHY_POLL;
-	//ether->mii_bus->irq[1] = ??   write me after the irq number is known
-
-	if (mdiobus_register(ether->mii_bus)) {
-		dev_err(&pdev->dev, "mdiobus_register() failed\n");
-		goto out2;
-	}
-
-	phydev = phy_find_first(ether->mii_bus);
-	if(phydev == NULL) {
-		err = -ENODEV;
-		dev_err(&pdev->dev, "phy_find_first() failed\n");
-		goto out3;
-	}
-
-	phydev = phy_connect(netdev, phydev_name(phydev),
-			     &adjust_link,
-			     PHY_INTERFACE_MODE_RMII);
-
-	if(IS_ERR(phydev)) {
-		err = PTR_ERR(phydev);
-		dev_err(&pdev->dev, "phy_connect() failed\n");
-		goto out3;
-	}
-
-	linkmode_copy(phydev->supported, PHY_BASIC_FEATURES);
-	linkmode_copy(phydev->advertising, phydev->supported);
+	/* MAC is 10/100 only */
+	phy_set_max_speed(phydev, SPEED_100);
+	phy_attached_info(phydev);
 	ether->phy_dev = phydev;
 	ether->wol = 0;
+	of_node_put(mdio_np);
 
 	return 0;
 
-out3:
-	mdiobus_unregister(ether->mii_bus);
-out2:
-	mdiobus_free(ether->mii_bus);
-out0:
-
+out_bus:
+	if (ether->mii_bus) {
+		mdiobus_unregister(ether->mii_bus);
+		mdiobus_free(ether->mii_bus);
+		ether->mii_bus = NULL;
+	}
+out_put:
+	of_node_put(mdio_np);
 	return err;
 }
 
@@ -1655,7 +1662,8 @@ static int nuc980_ether_probe(struct platform_device *pdev)
 
 	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
 	if (IS_ERR(pinctrl)) {
-		return PTR_ERR(pinctrl);
+		error = PTR_ERR(pinctrl);
+		goto err0;
 	}
 
 	ether->txirq = platform_get_irq(pdev, 0);
@@ -1748,9 +1756,14 @@ static int nuc980_ether_probe(struct platform_device *pdev)
 			ether->phy_dn = of_node_get(np);
 		}
 
+		/* "phy-mode" optional, MAC only supports RMII */
+		if (of_get_phy_mode(np, &ether->phy_mode))
+			ether->phy_mode = PHY_INTERFACE_MODE_RMII;
+
 		error = nuc980_mii_setup(netdev);
 		if (error < 0) {
-			dev_err(&pdev->dev, "nuc980_mii_setup err\n");
+			if (error != -EPROBE_DEFER)
+				dev_err(&pdev->dev, "nuc980_mii_setup err\n");
 			goto failed_free_napi;
 		}
 	}
@@ -1802,9 +1815,10 @@ static int nuc980_ether_remove(struct platform_device *pdev)
 	if (ether->phy_dev)
 		phy_disconnect(ether->phy_dev);
 
-	mdiobus_unregister(ether->mii_bus);
-	kfree(ether->mii_bus->irq);
-	mdiobus_free(ether->mii_bus);
+	if (ether->mii_bus) {
+		mdiobus_unregister(ether->mii_bus);
+		mdiobus_free(ether->mii_bus);
+	}
 
 	platform_set_drvdata(pdev, NULL);
 

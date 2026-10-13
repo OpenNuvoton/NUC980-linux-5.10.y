@@ -290,11 +290,35 @@
 			status = "okay";
 		};
 
-		emac0@b0012000 {
+		emac0: emac0@b0012000 {
 			status = "okay";
+			phy-handle = <&phy0>;
+
+			mdio {
+				#address-cells = <1>;
+				#size-cells = <0>;
+
+				phy0: ethernet-phy@1 {
+					reg = <1>;
+				};
+			};
 		};
-		emac1@b0022000 {
+		emac1: emac1@b0022000 {
 			status = "okay";
+			phy-mode = "rmii";
+			phy-handle = <&phy1>;
+
+			mdio {
+				#address-cells = <1>;
+				#size-cells = <0>;
+
+				/* PHY address: adjust to the board strapping */
+				phy1: ethernet-phy@1 {
+					reg = <1>;
+					/* PHY specific properties (e.g. LED mode)
+					 * are parsed by the PHY driver from here */
+				};
+			};
 		};
 		cap0@b0024000 {
 			status = "disabled";

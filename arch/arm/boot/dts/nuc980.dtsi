@@ -1874,18 +1874,20 @@
 			status = "okay";
 		};
 
-		emac0@b0012000 {
+		emac0: emac0@b0012000 {
 			compatible = "nuvoton,nuc980-emac0";
 			reg = <0xb0012000 0x1000>;
+			phy-mode = "rmii";
 			interrupts = <21 4 1>, <19 4 1>;
 			pinctrl-names = "default";
 			pinctrl-0 = <&pinctrl_emac0>;
 			status = "okay";
 		};
 
-		emac1@b0022000 {
+		emac1: emac1@b0022000 {
 			compatible = "nuvoton,nuc980-emac1";
 			reg = <0xb0022000 0x1000>;
+			phy-mode = "rmii";
 			interrupts = <22 4 1>, <20 4 1>;
 			pinctrl-names = "default";
 			pinctrl-0 = <&pinctrl_emac1>;
