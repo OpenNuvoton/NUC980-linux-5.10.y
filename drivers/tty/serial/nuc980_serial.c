@@ -738,6 +738,7 @@ static irqreturn_t nuc980serial_interrupt(int irq, void *dev_id)
 {
 	struct uart_nuc980_port *up = (struct uart_nuc980_port *)dev_id;
 	unsigned int isr, fsr;
+	unsigned long flags;
 
 	isr = serial_in(up, UART_REG_ISR);
 	fsr = serial_in(up, UART_REG_FSR);
@@ -757,8 +758,11 @@ static irqreturn_t nuc980serial_interrupt(int irq, void *dev_id)
 
 		check_modem_status(up);
 
-		if (isr & THRE_INT)
-			transmit_chars(up);
+		if (isr & THRE_INT){
+			spin_lock_irqsave(&up->port.lock, flags);
+    			transmit_chars(up);
+    			spin_unlock_irqrestore(&up->port.lock, flags);
+		}
 
 		if(fsr & (BIF | FEF | PEF | RX_OVER_IF | TX_OVER_IF)) {
 			serial_out(up, UART_REG_FSR, (BIF | FEF | PEF | RX_OVER_IF | TX_OVER_IF));
